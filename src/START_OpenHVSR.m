@@ -30,7 +30,7 @@ clc
 enable_menu = 0;
 
 mode = '2D';%%   only 2D (better for 2-D profiles)
-mode = '3D';%%  
+%mode = '3D';%%  
 
 %% some settings
 fontsizeis = 10;
