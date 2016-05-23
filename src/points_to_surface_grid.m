@@ -1,23 +1,3 @@
-% Copyright 2015 by Samuel Bignardi.
-% 
-% This file is part of the program OpenHVSR.
-% 
-% OpenHVSR is free software: you can redistribute it and/or modify
-% it under the terms of the GNU General Public License as published by
-% the Free Software Foundation, either version 3 of the License, or
-% (at your option) any later version.
-% 
-% OpenHVSR is distributed in the hope that it will be useful,
-% but WITHOUT ANY WARRANTY; without even the implied warranty of
-% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-% GNU General Public License for more details.
-% 
-% You should have received a copy of the GNU General Public License
-% along with OpenHVSR.  If not, see <http://www.gnu.org/licenses/>.
-%
-%
-%
-%
 function [sfx,sfy,meshed_surface] = points_to_surface_grid(xx,yy,points)%,minz)
     [sfx,sfy] = meshgrid(xx,yy);
 
@@ -36,6 +16,8 @@ function [sfx,sfy,meshed_surface] = points_to_surface_grid(xx,yy,points)%,minz)
         dists = sqrt((points(:,1)-extrap(p,1)).^2 + (points(:,2)-extrap(p,2)).^2);
         for ii = 1:size(points,1)
             if dists(ii) == min(dists);
+                %p
+                %ii
                 extrap(p,3) = points(ii,3);
                 break;
             end
@@ -52,4 +34,23 @@ function [sfx,sfy,meshed_surface] = points_to_surface_grid(xx,yy,points)%,minz)
     [sfx2,sfy2] = meshgrid(newxx,newyy);
     meshed_surface2 = F(sfx2,sfy2);
     meshed_surface = interp2(sfx2,sfy2,meshed_surface2, sfx,sfy, 'linear');
+    
+    % correct NaN's
+    %      for i = 1:size(qz,1)
+    %         for j = 1:size(qz,2)
+    %           if( isnan(qz(i,j)) )
+    %                 qz(i,j) = minz;
+    %           end
+    %         end
+    %     end
+
+
+
+
+%     figure
+%     % mesh(sfx2,sfy2,meshed_surface2); hold on
+%     mesh(sfx,sfy,meshed_surface);hold on;
+%     %plot3(points2(:,1), points2(:,2), points2(:,3),'ok');
+%     plot3(points(:,1),  points(:,2),  points(:,3),'or');
+
 end

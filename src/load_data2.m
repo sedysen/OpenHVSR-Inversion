@@ -1,23 +1,3 @@
-% Copyright 2015 by Samuel Bignardi.
-% 
-% This file is part of the program OpenHVSR.
-% 
-% OpenHVSR is free software: you can redistribute it and/or modify
-% it under the terms of the GNU General Public License as published by
-% the Free Software Foundation, either version 3 of the License, or
-% (at your option) any later version.
-% 
-% OpenHVSR is distributed in the hope that it will be useful,
-% but WITHOUT ANY WARRANTY; without even the implied warranty of
-% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-% GNU General Public License for more details.
-% 
-% You should have received a copy of the GNU General Public License
-% along with OpenHVSR.  If not, see <http://www.gnu.org/licenses/>.
-%
-%
-%
-%
 function FDAT = load_data2(working_folder,SURVEYS, datafile_columns,datafile_separator)
 
 %% Load Input FILES
@@ -57,9 +37,16 @@ for id = 1:N
         fprintf('id[%d] %s.\n',id,FileNameData);
         fprintf('      Header Evaluation:');
         B=B{1,1};
+        %     SAMP_FREQ=char(B(2,1));                       %%Original sampling frequence
+        %     SAMP_FREQ=SAMP_FREQ(1,13:size(SAMP_FREQ,2));
+        %     SAMP_FREQ=str2num(SAMP_FREQ);
+        %     NDAT=char(B(3,1));
+        %     NDAT=NDAT(1,8:size(NDAT,2));
+        %     NDAT=str2num(NDAT);
         for i = 1:size(B,1);
             % Finding a corrispondence in header
             % HD = separation between header and data
+            %fprintf('line[%d]  %s\n',i,B{i,1})
             Ref_SHD = strcmp(B{i,1},datafile_separator);
             if Ref_SHD==1
                 EOHind=i;  %%index of header end in matrix of cells "b".
@@ -108,6 +95,23 @@ for id = 1:N
         FDAT{id,3} = stdev;
     end
     
+    %message = strcat('Select input file #',ii);
+    %[FileName,PathName,FilterIndex] = uigetfile(input_filename_extension,message);
+
+    %1. imput field data:  load tt_ee_sant1.txt -ascii;
+    %INfiles{1,ii} = PathName;
+    %INfiles{2,ii} = FileName;
+    
+%     FileName = SURVEYS{id,2};%% get filename for field data
+%     array = load(strcat(working_folder, FileName),'-ascii');
+% 
+%     ff_scale = array(:,1);
+%     hv_curve = array(:,2);
+%     
+%     FDAT{id,1} = ff_scale;
+%     FDAT{id,2} = hv_curve;
+% 
+%     fprintf('id[%d] %s.\n',id,FileName);
 end
 fprintf('[Loading Done]\n');
 

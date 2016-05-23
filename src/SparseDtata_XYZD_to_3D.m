@@ -1,25 +1,8 @@
-% Copyright 2015 by Samuel Bignardi.
-% 
-% This file is part of the program OpenHVSR.
-% 
-% OpenHVSR is free software: you can redistribute it and/or modify
-% it under the terms of the GNU General Public License as published by
-% the Free Software Foundation, either version 3 of the License, or
-% (at your option) any later version.
-% 
-% OpenHVSR is distributed in the hope that it will be useful,
-% but WITHOUT ANY WARRANTY; without even the implied warranty of
-% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-% GNU General Public License for more details.
-% 
-% You should have received a copy of the GNU General Public License
-% along with OpenHVSR.  If not, see <http://www.gnu.org/licenses/>.
-%
-%
-%
-%
 function [XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,nx,ny,cutplanes)
-    
+    %{XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,dx,dy,dz, surface, handle)
+
+   
+
     % define the grid
     xq = linspace(min(surface_locations(:,1)), max(surface_locations(:,1)), nx);
     yq = linspace(min(surface_locations(:,2)), max(surface_locations(:,2)), ny);
@@ -44,16 +27,23 @@ function [XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,n
     
     [sfx,sfy,meshed_surface] = correct_for_surface();
     trim_edges();
-    
+    %VM = trim_edges();
     
     VM = smooth3(VM,'box',5);
     
     
-    
-    
+    %X(ym:yp, xm:xp, zm:zp);
+
     % Plot volume
     smoothvolume3(XM,YM,ZM,VM, xq,yq,zq, cutplanes);
+    % delete higher than meshed_surface 
+    %hold on;
+    %mesh(sfx,sfy,meshed_surface);
+    %hold on;
+    %plot3(surface_locations(:,1), surface_locations(:,2), surface_locations(:,3),'or');
     
+    fprintf('done')
+   
     
     %% SUBFUNCTIONS
     function [sfx,sfy,meshed_surface] = correct_for_surface() 
@@ -74,19 +64,41 @@ function [XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,n
     function trim_edges()
         for iv = 1:size(VM,2) %              grid: along x
             for jv = 1:size(VM,1) %                along y
+                %fprintf('%d %d\n',iv,jv)
                 for is = 1:size(meshed_surface,1)
                     for js = 1:size(meshed_surface,2)
+                         %fprintf('%d %d\n',is,js)
+                        
+                        
                         if( (abs(XM(jv,iv,1)-sfx(is,js))<0.001) && (abs(YM(jv,iv,1)-sfy(is,js))<0.001) )
                             if(isnan(meshed_surface(is,js)))
                             
                                 fprintf('(%f %f) (%f %f)\n',  XM(jv,iv,1),YM(jv,iv,1),  sfx(is,js),sfy(is,js))
+                                % tVM(jv,iv,:) = VM(jv,iv,:);
                                 VM(jv,iv,:) = 0;
                             end
+                        %else
+                        %    continue;
                         end
+                        %pause; clc
                     end
                 end
                 
             end
         end
     end
+%%
+
+
+% X = X(ym:yp, xm:xp, zm:zp);
+
+
+
+
+
+
+
+
+
+%
 end % function

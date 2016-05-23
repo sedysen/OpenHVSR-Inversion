@@ -1,31 +1,15 @@
-% Copyright 2015 by Samuel Bignardi.
-% 
-% This file is part of the program OpenHVSR.
-% 
-% OpenHVSR is free software: you can redistribute it and/or modify
-% it under the terms of the GNU General Public License as published by
-% the Free Software Foundation, either version 3 of the License, or
-% (at your option) any later version.
-% 
-% OpenHVSR is distributed in the hope that it will be useful,
-% but WITHOUT ANY WARRANTY; without even the implied warranty of
-% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-% GNU General Public License for more details.
-% 
-% You should have received a copy of the GNU General Public License
-% along with OpenHVSR.  If not, see <http://www.gnu.org/licenses/>.
-%
-%
-%
-%
 function [OUT] = prfsmoothing(IN, smoothing_strategy,smoothing_radius)
 
+
+
+    %% Smoothing ===========================================================
     nex = size(IN,2);
     nez = size(IN,1);
     r = smoothing_radius;
     SMOOTH = 0*IN;
     switch smoothing_strategy
         case 1
+            %fprintf('Smoothing -1- layerwise\n');
             for k = 1:nez
                 for i = 1:nex
                     imin = (i-r); if(imin <   1); imin =   1; end
@@ -37,6 +21,7 @@ function [OUT] = prfsmoothing(IN, smoothing_strategy,smoothing_radius)
                 end
             end
         case 2
+            %fprintf('Smoothing -2- broad layer\n');
             for k = 1:nez
                 for i = 1:nex
                     imin = (i-r); if(imin <   1); imin =   1; end
@@ -52,6 +37,7 @@ function [OUT] = prfsmoothing(IN, smoothing_strategy,smoothing_radius)
                 end
             end            
         case 3
+            %fprintf('Smoothing -3- bubble\n');
             for k = 1:nez
                 for i = 1:nex
                     imin = (i-r); if(imin <   1); imin =   1; end
@@ -68,8 +54,11 @@ function [OUT] = prfsmoothing(IN, smoothing_strategy,smoothing_radius)
             end
        otherwise
             SMOOTH = IN;
+            %fprintf('Smoothing -0- NOT PERFORMED\n');
     end
     OUT = SMOOTH;
+    %fname = strcat(colorkind,'_dir',dir,'_shot',sh,'.mat');
+    %save(fname);
 end
 
 

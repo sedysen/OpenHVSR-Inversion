@@ -1,23 +1,3 @@
-% Copyright 2015 by Samuel Bignardi.
-% 
-% This file is part of the program OpenHVSR.
-% 
-% OpenHVSR is free software: you can redistribute it and/or modify
-% it under the terms of the GNU General Public License as published by
-% the Free Software Foundation, either version 3 of the License, or
-% (at your option) any later version.
-% 
-% OpenHVSR is distributed in the hope that it will be useful,
-% but WITHOUT ANY WARRANTY; without even the implied warranty of
-% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-% GNU General Public License for more details.
-% 
-% You should have received a copy of the GNU General Public License
-% along with OpenHVSR.  If not, see <http://www.gnu.org/licenses/>.
-%
-%
-%
-%
 function [min_vs, ...
           min_vp_vs_ratio,max_vp_vs_ratio, ...
           min_ro,max_ro, ...
@@ -27,7 +7,9 @@ function [min_vs, ...
           HQMagnitude, ...
           HQEpicDistance, ...
           HQFocalDepth, ...
-          HQRockRatio] = setup_manager( ...
+          HQRockRatio, ...
+          sw_nmodes, ...
+          sw_nsmooth] = setup_manager( ...
           inmin_vs, ...
           inmin_vp_vs_ratio, inmax_vp_vs_ratio, ...
           inmin_ro,inmax_ro, ...
@@ -37,8 +19,31 @@ function [min_vs, ...
           inHQMagnitude, ...
           inHQEpicDistance, ...
           inHQFocalDepth, ...
-          inHQRockRatio)
+          inHQRockRatio, ...
+          insw_nmodes, ...
+          insw_nsmooth)
 
+
+% % function aa()
+% % close all; clear; clc
+% % load 'default_settings.mat'
+% % inmin_vs = min_vs;
+% % inmin_vp_vs_ratio =min_vp_vs_ratio; 
+% % inmax_vp_vs_ratio =max_vp_vs_ratio;
+% % inmin_ro = min_ro;
+% % inmax_ro = max_ro;
+% % inmin_H = min_H;
+% % inmax_H = max_H;
+% % inmin_qs = min_qs;
+% % inmax_qs = max_qs;
+% % inmin_qp_qs_ratio =min_qp_qs_ratio;
+% % inmax_qp_qs_ratio=max_qp_qs_ratio;
+% % 
+% % inHQMagnitude   =HQMagnitude;
+% % inHQEpicDistance=HQEpicDistance;
+% % inHQFocalDepth  =HQFocalDepth;
+% % inHQRockRatio   =HQRockRatio;
+%     
     %% init values
     min_vs = inmin_vs; 
     
@@ -56,6 +61,11 @@ function [min_vs, ...
           
     min_qp_qs_ratio = inmin_qp_qs_ratio;
     max_qp_qs_ratio = inmax_qp_qs_ratio;
+    
+    
+    sw_nmodes   = insw_nmodes;
+    sw_nsmooth  = insw_nsmooth;
+    
           
     HQMagnitude   = inHQMagnitude;
     HQEpicDistance= inHQEpicDistance;
@@ -66,11 +76,12 @@ function [min_vs, ...
     main_l = 0.1 * DSP(3);
     main_b = 0.1 * DSP(4);
     main_w = 0.45* DSP(3);
-    main_h = 0.5 * DSP(4);
+    main_h = 0.7 * DSP(4);
     
     hdiag = figure('name','Setup Manager','Visible','off','OuterPosition',[main_l, main_b, main_w, main_h],'NumberTitle','off','MenuBar','none');
-    P0 = uipanel(hdiag,'FontSize',12,'Units','normalized','Position',[ 0.0,  0.5,  1.0,  0.5 ],'title','Subsurface Constrains'); 
-    P1 = uipanel(hdiag,'FontSize',12,'Units','normalized','Position',[ 0.0,  0.0,  1.0,  0.5 ],'title','Target Earthquake');
+    P0 = uipanel(hdiag,'FontSize',12,'Units','normalized','Position',[ 0.0,  0.6,  1.0,  0.4 ],'title','Subsurface Constrains'); 
+    P1 = uipanel(hdiag,'FontSize',12,'Units','normalized','Position',[ 0.0,  0.2,  1.0,  0.4 ],'title','Target Earthquake');
+    P2 = uipanel(hdiag,'FontSize',12,'Units','normalized','Position',[ 0.0,  0.0,  1.0,  0.2],'title','Surface Waves');
       
     
     %% Setup
@@ -78,9 +89,10 @@ function [min_vs, ...
     Nrow = 8;
     dw = 0.01;
     dh = 0.00;
-    objh = 0.9*(1-dh)/Nrow;
+    objh = 0.9*(1-dh)/Nrow; % object sizes
     objy = dh + ( (Nrow-1):-1:0 )*(1/Nrow);
     
+    %[objx(2), objy(row), objw(2), objh]
     objw = [0.2, 0.2, 0.3, 0.2];
     gap  = 1-sum(objw)-2*dw;
     objx = dw + [0, objw(1), (sum(objw(1:2))+gap), (sum(objw(1:3))+gap)];
@@ -172,7 +184,29 @@ function [min_vs, ...
         'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
     h_rockrat = uicontrol('Style','edit','parent',P1, ...
         'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
-    %% --------------------------------------------------------------------
+    %% Surface Waves
+    Nrow = 4;
+    dw = 0.01;
+    dh = 0.00;
+    objh = 0.9*(1-dh)/Nrow; % object sizes
+    objy = dh + ( (Nrow-1):-1:0 )*(1/Nrow);
+    
+    baserow = 1;
+    row = baserow;
+    objw = [0.35, 0.2];
+    objx = dw + [0, objw(1)];
+    uicontrol('Style','text','parent',P2,'String','N. of modes', ...
+        'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
+    h_sw_nmodes = uicontrol('Style','edit','parent',P2, ...
+        'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
+    %
+    row = row + 1;
+    uicontrol('Style','text','parent',P2,'String','Smoothing', ...
+        'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
+    h_sw_nsmooth = uicontrol('Style','edit','parent',P2, ...
+        'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
+        
+    %% INIT manager interface ---------------------------------------------
     set(h_min_vs,     'String', num2str(  inmin_vs  ));
     set(h_min_vpvs,   'String', num2str(  inmin_vp_vs_ratio  ));
     set(h_max_vpvs,   'String', num2str(  inmax_vp_vs_ratio  ));
@@ -184,12 +218,16 @@ function [min_vs, ...
     set(h_max_qs,     'String', num2str(  inmax_qs  ));
     set(h_min_qpqs,   'String', num2str(  inmin_qp_qs_ratio  ));
     set(h_max_qpqs,   'String', num2str(  inmax_qp_qs_ratio  ));
+    
     set(h_magnitude,  'String', num2str(  inHQMagnitude  ));
     set(h_distance,   'String', num2str(  inHQEpicDistance  ));
     set(h_focal_depth,'String', num2str(  inHQFocalDepth  ));
     set(h_rockrat,    'String', num2str(  inHQRockRatio  ));
+    
+    set(h_sw_nmodes,  'String', num2str(  insw_nmodes  ));
+    set(h_sw_nsmooth, 'String', num2str(  insw_nsmooth  ));
     %% --------------------------------------------------------------------
-    set(hdiag,'Visible','on');
+
     
     %% Buttons
     uicontrol('Parent',P1,'Style','pushbutton','Units','normalized','String','Save as default', ...
@@ -206,7 +244,12 @@ function [min_vs, ...
     uicontrol('Parent',P1,'Style','pushbutton','Units','normalized','String','Save and exit', ...
         'Units','normalized','Position',[0.795, 0.1, 0.2, 0.1], ...
         'Callback',{@save_and_exit});
+    %% 
+    set(hdiag,'Visible','on');    
     
+    
+    
+    %% functions
     function discard_and_quit(~,~,~); close(hdiag); end% quit without changes
 
     function save_and_exit(~,~,~)% exit with status 
@@ -229,6 +272,9 @@ function [min_vs, ...
         HQEpicDistance  =  str2double( get(h_distance,   'String') );
         HQFocalDepth    =  str2double( get(h_focal_depth,'String') );
         HQRockRatio     =  str2double( get(h_rockrat,    'String') );
+        %
+        sw_nmodes       =  str2double( get(h_sw_nmodes, 'String') );
+        sw_nsmooth      =  str2double( get(h_sw_nsmooth,'String') );
         
         close(hdiag)        
     end
@@ -253,8 +299,11 @@ function [min_vs, ...
         HQEpicDistance  =  str2double( get(h_distance,   'String') );
         HQFocalDepth    =  str2double( get(h_focal_depth,'String') );
         HQRockRatio     =  str2double( get(h_rockrat,    'String') );
+        %
+        sw_nmodes       =  str2double( get(h_sw_nmodes, 'String') );
+        sw_nsmooth      =  str2double( get(h_sw_nsmooth,'String') );
         
-        save 'default_settings.mat' 'min_vs' 'min_vp_vs_ratio' 'max_vp_vs_ratio' 'min_ro' 'max_ro' 'min_H' 'max_H' 'min_qs' 'max_qs' 'min_qp_qs_ratio' 'max_qp_qs_ratio' 'HQMagnitude' 'HQEpicDistance' 'HQFocalDepth' 'HQRockRatio'       
+        save 'default_settings.mat' 'min_vs' 'min_vp_vs_ratio' 'max_vp_vs_ratio' 'min_ro' 'max_ro' 'min_H' 'max_H' 'min_qs' 'max_qs' 'min_qp_qs_ratio' 'max_qp_qs_ratio' 'HQMagnitude' 'HQEpicDistance' 'HQFocalDepth' 'HQRockRatio' 'sw_nmodes' 'sw_nsmooth'
     end
     function reset_to_factory(~,~,~) 
         min_vs                      = 80;
@@ -278,8 +327,13 @@ function [min_vs, ...
         HQEpicDistance              = 20;
         HQFocalDepth                = 10;
         HQRockRatio                 = 0.5;
-        save 'default_settings.mat' 'min_vs' 'min_vp_vs_ratio' 'max_vp_vs_ratio' 'min_ro' 'max_ro' 'min_H' 'max_H' 'min_qs' 'max_qs' 'min_qp_qs_ratio' 'max_qp_qs_ratio' 'HQMagnitude' 'HQEpicDistance' 'HQFocalDepth' 'HQRockRatio'
+        sw_nmodes                   =  15;
+        sw_nsmooth                  =   5;
         
+        sw_nmodes       =  str2double( get(h_sw_nmodes, 'String') );
+        sw_nsmooth      =  str2double( get(h_sw_nsmooth,'String') );
+        save 'default_settings.mat' 'min_vs' 'min_vp_vs_ratio' 'max_vp_vs_ratio' 'min_ro' 'max_ro' 'min_H' 'max_H' 'min_qs' 'max_qs' 'min_qp_qs_ratio' 'max_qp_qs_ratio' 'HQMagnitude' 'HQEpicDistance' 'HQFocalDepth' 'HQRockRatio' 'sw_nmodes' 'sw_nsmooth'
+    
         set(h_min_vs,     'String', num2str(  min_vs  ));
         set(h_min_vpvs,   'String', num2str(  min_vp_vs_ratio  ));
         set(h_max_vpvs,   'String', num2str(  max_vp_vs_ratio  ));
@@ -291,11 +345,14 @@ function [min_vs, ...
         set(h_max_qs,     'String', num2str(  max_qs  ));
         set(h_min_qpqs,   'String', num2str(  min_qp_qs_ratio  ));
         set(h_max_qpqs,   'String', num2str(  max_qp_qs_ratio  ));
+        %
         set(h_magnitude,  'String', num2str(  HQMagnitude  ));
         set(h_distance,   'String', num2str(  HQEpicDistance  ));
         set(h_focal_depth,'String', num2str(  HQFocalDepth  ));
         set(h_rockrat,    'String', num2str(  HQRockRatio  ));
-        
+        %
+        set(h_sw_nmodes,  'String', num2str(  sw_nmodes  ));
+        set(h_sw_nsmooth, 'String', num2str(  sw_nsmooth  ));
     end
     waitfor(hdiag)
 end

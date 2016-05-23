@@ -1,24 +1,24 @@
-% Copyright 2015 by Samuel Bignardi.
-% 
-% This file is part of the program OpenHVSR.
-% 
-% OpenHVSR is free software: you can redistribute it and/or modify
-% it under the terms of the GNU General Public License as published by
-% the Free Software Foundation, either version 3 of the License, or
-% (at your option) any later version.
-% 
-% OpenHVSR is distributed in the hope that it will be useful,
-% but WITHOUT ANY WARRANTY; without even the implied warranty of
-% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-% GNU General Public License for more details.
-% 
-% You should have received a copy of the GNU General Public License
-% along with OpenHVSR.  If not, see <http://www.gnu.org/licenses/>.
-%
-%
-%
-%
 function [X,Y,Z,V,p1,p2] = smoothvolume3(X,Y,Z,V, xl,yl,zl, cutplanes)
+%
+% cextr = extremal values for color
+% isov  = eztremal interesting values in data
+% dv    = increments for isosurfaces
+%    
+
+%[X,Y,Z,V,xl,yl,zl] =S3D_cubes2matlabgrid(nex,ney,nez,XYZ,D3);
+% for k = 1:size(V ,3)
+%     for j = 1:size(V ,2)
+%         for i = 1:size(V ,1)
+%             if( isnan(V(i,j,k)) );  V(i,j,k) = 0; end
+%         end
+%     end
+% end
+%D = V;%.*mask;
+%Dp =(D > 0);
+%Dm =(D < 0); 
+
+
+%clc
 % x-/x-
 Lx = size(V,2);
 xm  = floor(length(xl)*(cutplanes(1)));  if xm < 1; xm =1; end
@@ -40,14 +40,36 @@ zp  = floor(length(zl)*(cutplanes(6))); if zp > Lz; zp =Lz; end
 if(zm >= Lz); zm = floor(Lz/2); end
 if(zp <= 1);  zp = floor(Lz/2); end
 if(zm>=zp); zp=zm+1; end
+
+% ym
+% yp 
+% xm
+% xp
+% zm
+% zp
 X = X(ym:yp, xm:xp, zm:zp);
 Y = Y(ym:yp, xm:xp, zm:zp);
 Z = Z(ym:yp, xm:xp, zm:zp);
 V = V(ym:yp, xm:xp, zm:zp); 
+% Dp=Dp(ym:yp, xm:xp, zm:zp); 
+% Dm=Dm(ym:yp, xm:xp, zm:zp); 
+
 
 hold on
+% p1 = patch( isosurface(X,Y,Z,Dp, 0.01),'FaceColor','red','EdgeColor','none');
+% p2 = patch( isosurface(X,Y,Z,Dm, 0.01),'FaceColor','blue','EdgeColor','none');
+
+%patch(isocaps(X,Y,Z,V, 5),'FaceColor','interp','EdgeColor','none');
+%patch(isocaps(X,Y,Z,V, 5, 'enclose','above'),'FaceColor','interp','EdgeColor','none');
+
+% p3 = patch( isocaps(X,Y,Z,V.*(V>0), 0.001, 'enclose','above'),'FaceColor','interp','EdgeColor','none');
+% p4 = patch( isocaps(X,Y,Z,V.*(V<0), -0.001, 'enclose','below'),'FaceColor','interp','EdgeColor','none');
+
+%min(min(min(X)))
+
 
 p1 = patch(isosurface(X,Y,Z,V, 5),'FaceColor','red','EdgeColor','none');
+%p1 = patch(isosurface(X,Y,Z,V, 5),'FaceColor','interp','EdgeColor','none');
 isonormals(X,Y,Z,V,p1);
 p2 = patch(isocaps(X,Y,Z,V, 5),'FaceColor','interp','EdgeColor','none');
 

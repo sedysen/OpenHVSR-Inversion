@@ -1,15 +1,15 @@
 function Y = moving_average(X,F)
-% Y = MOVING_AVERAGE(X,F) Suaviza rï¿½pidamente el vector X usando el 
+% Y = MOVING_AVERAGE(X,F) Suaviza rápidamente el vector X usando el 
 %   promedio en movimiento de los 2F+1 elementos alrededor de cada elemento 
 %   de X.
 %
-% Ver tambiï¿½n MOVING_AVERAGE2.M, NANMOVING_AVERAGE.M, NANMOVING_AVERAGE2.M
+% Ver también MOVING_AVERAGE2.M, NANMOVING_AVERAGE.M, NANMOVING_AVERAGE2.M
 %
 % Programa creado por
-% Lic. en Fï¿½sica Carlos Adriï¿½n Vargas Aguilera
-% Maestrï¿½a en Hidrometeorologï¿½a
+% Lic. en Física Carlos Adrián Vargas Aguilera
+% Maestría en Hidrometeorología
 % Universidad de Guadalajara
-% Mï¿½xico, marzo 2006
+% México, marzo 2006
 %
 % nubeobscura@hotmail.com
 
@@ -32,8 +32,8 @@ Y(N-F+1:N) = Yfin;
 
 
 function Y = Q_rectangulo(X,F)
-% Ventana rectï¿½ngulo, de ancho: 2*F+1 aplicada a la serie de datos X, via
-% promedio en movimiento recursivo (muy rï¿½pido)
+% Ventana rectángulo, de ancho: 2*F+1 aplicada a la serie de datos X, via
+% promedio en movimiento recursivo (muy rápido)
 %
 % nubeobscura@hotmail.com
 
@@ -46,11 +46,11 @@ end
 N = length(X);
 ancho = 2*F + 1;             % ancho del filtro
 Y = zeros(size(X));          % limpia la variable
-Y(F+1) = sum(X(1:ancho));    % inicio de la recursiï¿½n
+Y(F+1) = sum(X(1:ancho));    % inicio de la recursión
 for n = F+2:N-F
  Y(n) = Y(n-1) + X(n+F) - X(n-F-1);   % moving average recursivo
 end
 Y = Y/ancho;
 
 
-% Carlos Adriï¿½n. nubeobscura@hotmail.com
+% Carlos Adrián. nubeobscura@hotmail.com
