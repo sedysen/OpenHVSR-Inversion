@@ -4,7 +4,7 @@ OpenHVSR is an algorithm developed in Matlab® (Release 2010a) designed for the 
 Latest Version: v2.0 (beta)
 	This has many more features compared with version 1.0.
 	It has been extensively tested, however few bugs may still exist.
-	For this reason, I indicated tis as a 'beta' version
+	For this reason, I indicated this as a 'beta' version
 
 Last stable version: v1.0
 
