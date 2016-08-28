@@ -321,13 +321,13 @@ uimenu(h10,'Label','Credits','Callback',{@Menu_About_Credits});
 %% ************************* INTERFACE OBJECTS ****************************
 %% Tabs
 str = warning('off', 'MATLAB:uitabgroup:OldVersion');
-hTabGroup = uitabgroup('v0','Parent',h_gui);
+hTabGroup = uitabgroup('Parent',h_gui);
 warning(str);
-hTab_Inversion = uitab('v0','Parent',hTabGroup, 'Title','Inversion');
-hTab_1d_viewer = uitab('v0','Parent',hTabGroup, 'Title','1D Model Viewer');
-hTab_2d_viewer = uitab('v0','Parent',hTabGroup, 'Title','2D Model Viewer');
-hTab_Confidenc = uitab('v0','Parent',hTabGroup, 'Title','Confidence');
-hTab_Sensitivt = uitab('v0','Parent',hTabGroup, 'Title','Sensitivity');
+hTab_Inversion = uitab('Parent',hTabGroup, 'Title','Inversion');
+hTab_1d_viewer = uitab('Parent',hTabGroup, 'Title','1D Model Viewer');
+hTab_2d_viewer = uitab('Parent',hTabGroup, 'Title','2D Model Viewer');
+hTab_Confidenc = uitab('Parent',hTabGroup, 'Title','Confidence');
+hTab_Sensitivt = uitab('Parent',hTabGroup, 'Title','Sensitivity');
 %%    Panels: locations and sizes 
 Nrowa = 30;
 %% TAB: ========================================================= Inversion
