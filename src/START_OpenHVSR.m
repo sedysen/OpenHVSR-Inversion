@@ -18,11 +18,13 @@
 %%       June      12 2015            Interface completed      
 %%       June      24 2015            First 'beta' version completed  
 %%       August    15 2015            Extended to 3D
-%%       August    28 2015            Bugfix: Matlab Tab support
+%%       August    28 2015            Bugfix: Matlab Tab support (V0 parameter)
 %% 
 
 
 %%%-----------------------------
+feature('DefaultCharacterSet', 'UTF8')
+
 clear global
 clear all
 close all
@@ -37,7 +39,7 @@ Matlab_Release = '2015b';
 enable_menu = 0;
 %%  -----------------------------------------------------------------------
 mode = '2D';%%   only 2D (better for 2-D profiles)
-mode = '3D';%%  
+%mode = '3D';%%  
 %%  -----------------------------------------------------------------------
 %% some settings
 fontsizeis = 10;
