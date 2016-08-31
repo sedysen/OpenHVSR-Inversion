@@ -22,7 +22,7 @@
 % Lateral constrained montecarlo inversion of HVSR data
 %
 
-function gui_2D(enable_menu,fontsizeis)   
+function gui_2D(Matlab_Release,enable_menu,fontsizeis)   
 
 close all
 clc
@@ -287,7 +287,6 @@ uimenu(h0,'Label','Resume Elaboration','Callback',{@Menu_Load_elaboration});
 h1  = uimenu(h_gui,'Label','Settings');
 uimenu(h1,'Label','Setup','Callback',{@Menu_Settings_Setup});
 uimenu(h1,'Label','Objective Func.','Callback',{@Menu_Settings_objective});
-
 %%    View
 h5  = uimenu(h_gui,'Label','View');
 h51 = uimenu(h5,'Label','HVSR');
@@ -320,14 +319,35 @@ uimenu(h10,'Label','Credits','Callback',{@Menu_About_Credits});
 %%
 %% ************************* INTERFACE OBJECTS ****************************
 %% Tabs
-str = warning('off', 'MATLAB:uitabgroup:OldVersion');
-hTabGroup = uitabgroup('Parent',h_gui);
-warning(str);
-hTab_Inversion = uitab('Parent',hTabGroup, 'Title','Inversion');
-hTab_1d_viewer = uitab('Parent',hTabGroup, 'Title','1D Model Viewer');
-hTab_2d_viewer = uitab('Parent',hTabGroup, 'Title','2D Model Viewer');
-hTab_Confidenc = uitab('Parent',hTabGroup, 'Title','Confidence');
-hTab_Sensitivt = uitab('Parent',hTabGroup, 'Title','Sensitivity');
+switch Matlab_Release
+    case '2010a'
+        str = warning('off', 'MATLAB:uitabgroup:OldVersion');
+        hTabGroup = uitabgroup('v0','Parent',h_gui);
+        warning(str);
+        hTab_Inversion = uitab('v0','Parent',hTabGroup, 'Title','Inversion');
+        hTab_1d_viewer = uitab('v0','Parent',hTabGroup, 'Title','1D Model Viewer');
+        hTab_2d_viewer = uitab('v0','Parent',hTabGroup, 'Title','2D Model Viewer');
+        hTab_Confidenc = uitab('v0','Parent',hTabGroup, 'Title','Confidence');
+        hTab_Sensitivt = uitab('v0','Parent',hTabGroup, 'Title','Sensitivity');
+    case '2015b'
+        str = warning('off', 'MATLAB:uitabgroup:OldVersion');
+        hTabGroup = uitabgroup('Parent',h_gui);
+        warning(str);
+        hTab_Inversion = uitab('Parent',hTabGroup, 'Title','Inversion');
+        hTab_1d_viewer = uitab('Parent',hTabGroup, 'Title','1D Model Viewer');
+        hTab_2d_viewer = uitab('Parent',hTabGroup, 'Title','2D Model Viewer');
+        hTab_Confidenc = uitab('Parent',hTabGroup, 'Title','Confidence');
+        hTab_Sensitivt = uitab('Parent',hTabGroup, 'Title','Sensitivity');
+    otherwise
+        str = warning('off', 'MATLAB:uitabgroup:OldVersion');
+        hTabGroup = uitabgroup('Parent',h_gui);
+        warning(str);
+        hTab_Inversion = uitab('Parent',hTabGroup, 'Title','Inversion');
+        hTab_1d_viewer = uitab('Parent',hTabGroup, 'Title','1D Model Viewer');
+        hTab_2d_viewer = uitab('Parent',hTabGroup, 'Title','2D Model Viewer');
+        hTab_Confidenc = uitab('Parent',hTabGroup, 'Title','Confidence');
+        hTab_Sensitivt = uitab('Parent',hTabGroup, 'Title','Sensitivity');
+end
 %%    Panels: locations and sizes 
 Nrowa = 30;
 %% TAB: ========================================================= Inversion
