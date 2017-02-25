@@ -96,7 +96,7 @@ prev_BEST_SINGLE_MISFIT = [];
 prev_single_it          = 0;
 %
 weight_curv =[];                                % curve weights definition
-CW = {};                                        % USED  curve-weights
+CW = {};                                          % USED  curve-weights
 %
 weight_dpth=[];                                % depth weights definition
 DW  = {};                                      % USED  depth-weights
@@ -339,6 +339,7 @@ switch Matlab_Release
         hTab_Confidenc = uitab('Parent',hTabGroup, 'Title','Confidence');
         hTab_Sensitivt = uitab('Parent',hTabGroup, 'Title','Sensitivity');
     otherwise
+        fprintf('Generic Matlab Release mode: %s\n',Matlab_Release)
         str = warning('off', 'MATLAB:uitabgroup:OldVersion');
         hTabGroup = uitabgroup('Parent',h_gui);
         warning(str);
@@ -347,6 +348,7 @@ switch Matlab_Release
         hTab_2d_viewer = uitab('Parent',hTabGroup, 'Title','2D Model Viewer');
         hTab_Confidenc = uitab('Parent',hTabGroup, 'Title','Confidence');
         hTab_Sensitivt = uitab('Parent',hTabGroup, 'Title','Sensitivity');
+        
 end
 %%    Panels: locations and sizes 
 Nrowa = 30;
@@ -3977,14 +3979,20 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 
     function setup_curve_weights()
         for d = 1 :size(FDAT,1)
-            nti = length(main_scale); %   n of time samples of the data
-            
-            CW{d} = ones(nti,1);
-            for fi = 1:length(main_scale)
-                if(CW{d}(fi) < 0.0000001)
-                    CW{d}(fi) = 0;
-                end
-            end
+            CW{d}= spline(weight_curv(:,1), weight_curv(:,2), main_scale);
+%             figure
+%             plot(weight_curv(:,1), weight_curv(:,2),'k'); hold on
+%             plot(main_scale, CW{d},'.b')
+
+%>>               CW{d} = weight_curv(:,2);%ones(nti,1);
+
+%             nti = length(main_scale); %   n of time samples of the data
+%             CW{d} = ones(nti,1);
+%             for fi = 1:length(main_scale)
+%                 if(CW{d}(fi) < 0.0000001)
+%                     CW{d}(fi) = 0;
+%                 end
+%             end
         end
     end
     function setup_dpth_weights()
@@ -4636,6 +4644,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         weights = (CW{survey_id}).^2;
         weights(DISCARDS{survey_id},:) = 0;
         weights = weights(ixmin_id:ixmax_id);
+        
+        % figure; plot(main_scale, CW{survey_id},'.-b'); pause
         
         %% curve term
         w2 = weights.^2;

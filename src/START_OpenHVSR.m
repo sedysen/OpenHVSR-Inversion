@@ -34,7 +34,8 @@ clc
 % "Tabs" in the gui. To solve potential errors, the user is encouraged to
 % chose the best working one of the following configurations. 
 % Matlab_Release = '2010a';
-Matlab_Release = '2015b';
+% Matlab_Release = '2015b';
+Matlab_Release = '2016b';
 %%  -----------------------------------------------------------------------
 enable_menu = 0;
 %%  -----------------------------------------------------------------------
