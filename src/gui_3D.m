@@ -180,13 +180,13 @@ data_1d_to_show           = 0;
 property_1d_to_show       = 0;
 property_23d_to_show      = 0;
 
-ZZList  = [];
+ZZList  = [];% zlevels + elevation
 VPList  = [];
 VSList  = [];
 ROList  = [];
 QPList  = [];
 QSList  = [];
-zlevels    = [];%  All from 0. Not accounts for elevation
+zlevels    = [];%  All from 0. Not accounts for elevation (it is depth, negative z)
 xpositions = [];%  All from 0. Not accounts for elevation 
 bedrock    = [];
 %
@@ -5050,7 +5050,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         xpositions = zeros(nmodels,1);
         
         ZZList = zeros(length(zlevels), nmodels);
-        for m = 1:nmodels;
+        for m = 1:nmodels
             ZZList(:,m) = zlevels + SURVEYS{m,1}(3);
         end
         

@@ -1,15 +1,37 @@
 function [XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,nx,ny,cutplanes)
     %{XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,dx,dy,dz, surface, handle)
 
-   
+   % Z = model levels + elevation: 
 
-    % define the grid
+    %% define the grid
+    terrain_dz = max(surface_locations(:,3))-min(surface_locations(:,3));
+    
     xq = linspace(min(surface_locations(:,1)), max(surface_locations(:,1)), nx);
     yq = linspace(min(surface_locations(:,2)), max(surface_locations(:,2)), ny);
+    [sfx,sfy,meshed_surface] = terrain();
+    %min_dz_terrain
+    delta = abs(meshed_surface - min(min(meshed_surface)));
+    midz = max(max(delta));
+    for ii = 1:size(delta,1)
+        for jj = 1:size(delta,2)
+            if delta(ii,jj)<midz  && delta(ii,jj)>0  
+                midz = delta(ii,jj);
+            end
+        end
+    end
+    
+    %zq_old = linspace( min(min(Z)), max(max(Z)), size(Z,1));
     zq = linspace( min(min(Z)), max(max(Z)), size(Z,1));
+    if 1.5*midz<terrain_dz
+        nz_terrain = 2*fix(terrain_dz/midz);
+        zq_terrain = linspace( min(surface_locations(:,3)), max(surface_locations(:,3)), nz_terrain);
+        zq_subsrf = linspace( min(min(Z)), min(surface_locations(:,3)), size(Z,1));
+        zq = [ zq_subsrf(1:(end-1)), zq_terrain];
+    end
+   
     [XM,YM,ZM] = meshgrid(xq,yq,zq);
 
-    % order the sparse data values
+    %% order the sparse data values
     N = size(D,2);
     L = size(D,1)*size(D,2);
     X = 0*D;
@@ -22,34 +44,51 @@ function [XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,n
     Y = reshape( Y, L,1);
     Z = reshape( Z, L,1);
     D = reshape( D, L,1);
+    
+    
+    
+    
 
     VM = griddata3( X, Y, Z, D, XM,YM,ZM, 'nearest');
-    
-    [sfx,sfy,meshed_surface] = correct_for_surface();
+    VM = smooth3(VM,'box',5);
+    correct_for_surface(meshed_surface);
     trim_edges();
     %VM = trim_edges();
     
-    VM = smooth3(VM,'box',5);
+    
     
     
     %X(ym:yp, xm:xp, zm:zp);
 
-    % Plot volume
+    %% Plot volume
     smoothvolume3(XM,YM,ZM,VM, xq,yq,zq, cutplanes);
     % delete higher than meshed_surface 
-    %hold on;
-    %mesh(sfx,sfy,meshed_surface);
-    %hold on;
-    %plot3(surface_locations(:,1), surface_locations(:,2), surface_locations(:,3),'or');
+    hold on;
+    mesh(sfx,sfy,meshed_surface,'FaceColor','none');
     
+%     for k = 1:size(VM,3)
+%         if(VM(1,1,k)~=0)
+%             %fprintf('%d %d %d\n',i,j,k)
+%             plot3( XM(1,1,k),YM(1,1,k), ZM(1,1,k), '.k'); 
+%         end
+%     end
+    
+    %hold on;
+    plot3(surface_locations(:,1), surface_locations(:,2), surface_locations(:,3),'or');
+    xlim([min(surface_locations(:,1)), max(surface_locations(:,1))]); hold on
+    ylim([min(surface_locations(:,2)), max(surface_locations(:,2))]); hold off
+    %zlim([min(surface_locations(:,3)), max(surface_locations(:,3))]); hold on
+    hold off
     fprintf('done')
    
     
     %% SUBFUNCTIONS
-    function [sfx,sfy,meshed_surface] = correct_for_surface() 
-        % define meshed surface and correct
+    function [sfx,sfy,meshed_surface] = terrain() 
         [sfx,sfy,meshed_surface] = points_to_surface_grid(xq,yq,surface_locations);
-
+    end
+    function correct_for_surface(meshed_surface) 
+        % define meshed surface and correct
+       %dzmez=0.5*abs(ZM(1,1,1)-ZM(1,1,2))
         for j = 1:size(meshed_surface,1)
             for i = 1:size(meshed_surface,2)
                 for k = 1:size(VM,3)
