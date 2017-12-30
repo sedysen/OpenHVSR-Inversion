@@ -48,7 +48,7 @@ x = 0;
 %
 %% PROGRAM machinery
 %%    ON/OFF Features
-beta_stuff_enable_status   = 'off';
+beta_stuff_enable_status   = 'on';
 if ispc()
     FLAG__PC_features = 'on';
 else
@@ -974,7 +974,20 @@ Btn0 = uicontrol('Style','pushbutton','parent',hT4_P1,'Units','normalized', ...
     'FontSize',fontsizeis, ...
     'String','Reset', ...
     'Position',[objx, objy(row), objw, objh], 'Enable','on', ...
-    'Callback',{@Button0_Callback});
+    'Callback',{@ResetSlices_Callback});
+%%
+row = row+3;
+h_togg_terrain = uicontrol('Style','radiobutton','parent',hT4_P1,'Units','normalized', ...
+    'Value',1, ...
+    'String','Terrain', ...
+    'Position',[objx, objy(row), objw, objh],'Callback',{@BT_refresh_modelview});
+row = row+1;
+h_togg_measpoints = uicontrol('Style','radiobutton','parent',hT4_P1,'Units','normalized', ...
+    'Value',1, ...
+    'String','Survey', ...
+    'Position',[objx, objy(row), objw, objh],'Callback',{@BT_refresh_modelview});
+row = row+1;
+
 %%    Panel-B: 2D/3D representation
 pos_panel = [0.1 0,  0.9 1];
 pos_axes  = [0.05 0.05 0.90 0.90];
@@ -3432,7 +3445,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             plot_3d(h_gui,  hAx_2Dprof,property_23d_to_show);
         end
     end
-    function Button0_Callback(hObject, eventdata, handles)
+    function ResetSlices_Callback(hObject, eventdata, handles)
         set(Slider0,'Value',0); set(Slider0b,'Value',1);
         set(Slider1,'Value',0); set(Slider1b,'Value',1);
         set(Slider2,'Value',0); set(Slider2b,'Value',1);
@@ -5243,54 +5256,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             end
         end
     end
-%%     function plot_1d_profile(hhdl)
-%         switch(property_1d_to_show)
-%             case 1;  P = MDLS{data_1d_to_show}(:,1); str = 'Vp (m/s)';
-%             %  
-%             case 3;  P = MDLS{data_1d_to_show}(:,3); str = 'Ro';
-%             % -----------------------------------4   id thickness    
-%             case 4;  P = MDLS{data_1d_to_show}(:,5); str = 'Qp';
-%             case 5;  P = MDLS{data_1d_to_show}(:,6); str = 'Qp';
-%             %
-%             case 6; 
-%                 vp = MDLS{data_1d_to_show}(:,1);
-%                 vs = MDLS{data_1d_to_show}(:,2);
-%                 P = 0.5*(vp.^2 - 2*vs.^2)./(vp.^2 - vs.^2);% Nu
-%                 str = 'Poisson Rat.';
-%                 
-%             case 7; P = DW{data_1d_to_show}; str = 'Depth Weigth';% Depth-Weights 
-%             otherwise
-%                 P = MDLS{data_1d_to_show}(:,2); str = 'Vs (m/s)';
-%         end
-%         DH = MDLS{data_1d_to_show}(:,4);
-%         
-%         %%
-%         if(hhdl==hAx_geo)
-%             set(h_gui,'CurrentAxes',hAx_geo);
-%         end
-%         %hold(hhdl,'off')
-%         %axis ij
-%         %grid %(hhdl,'on')
-% 
-%         nl = size(DH,1);
-%         DL = zeros(nl+1,1);
-%         for ll=1:nl-1
-%             DL(ll+1) = -sum(DH(1:ll)); 
-%         end
-%         DL(nl+1) = -(sum(DH(1:ll))+5); 
-% 
-%         for ll=1:nl
-%             plot(hhdl,   P(ll)*[1 1],  [DL(ll), DL(ll+1)], 'k', 'linewidth',2);
-%             hold(hhdl,'on')
-%             if(ll<nl); 
-%                 plot(hhdl,  [P(ll), P(ll+1)],  DL(ll+1)*([1,1]), 'k');
-%             end
-%         end
-%         grid on
-%         xlabel(str);
-%         ylabel('z(m)');
-%     end
-%%
+
+    %%
     function plot_2d_profile(figure_handle, axes_handle, quantity)
         if(isempty(profile_ids))
             Message = ['Profile not yet defined.'];
@@ -5355,11 +5322,17 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             otherwise; prpperty = VSList; str='Vs'; Z = ZZList; nxx = nx_ticks; nyy = ny_ticks;
         end
         
-        SparseDtata_XYZD_to_3D(receiver_locations,Z,prpperty,nxx,nyy,cutplanes);
+        show_terrain = get(h_togg_terrain,'Value');
+        SparseDtata_XYZD_to_3D(receiver_locations,Z,prpperty,nxx,nyy,cutplanes,show_terrain);
         
         view(viewerview); hold on
         title(str);
-        plot3(receiver_locations(:,1),receiver_locations(:,2),receiver_locations(:,3),'og','markersize',5,'markerfacecolor','g')
+        
+        if( get(h_togg_measpoints,'Value') )
+            plot3(receiver_locations(:,1),receiver_locations(:,2),receiver_locations(:,3),'og','markersize',5,'markerfacecolor','g')
+            hold on
+            plot3(receiver_locations(:,1), receiver_locations(:,2), receiver_locations(:,3),'or');
+        end
     end
     function ViewerPostCallback(obj,evd)
        viewerview= round(get(evd.Axes,'View'));

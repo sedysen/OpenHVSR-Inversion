@@ -1,4 +1,4 @@
-function [XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,nx,ny,cutplanes)
+function [XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,nx,ny,cutplanes,show_terrain)
     %{XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,dx,dy,dz, surface, handle)
 
    % Z = model levels + elevation: 
@@ -64,7 +64,9 @@ function [XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,n
     smoothvolume3(XM,YM,ZM,VM, xq,yq,zq, cutplanes);
     % delete higher than meshed_surface 
     hold on;
-    mesh(sfx,sfy,meshed_surface,'FaceColor','none');
+    if(show_terrain)
+        mesh(sfx,sfy,meshed_surface,'FaceColor','none');
+    end
     
 %     for k = 1:size(VM,3)
 %         if(VM(1,1,k)~=0)
@@ -74,7 +76,6 @@ function [XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,n
 %     end
     
     %hold on;
-    plot3(surface_locations(:,1), surface_locations(:,2), surface_locations(:,3),'or');
     xlim([min(surface_locations(:,1)), max(surface_locations(:,1))]); hold on
     ylim([min(surface_locations(:,2)), max(surface_locations(:,2))]); hold off
     %zlim([min(surface_locations(:,3)), max(surface_locations(:,3))]); hold on

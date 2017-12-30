@@ -5083,9 +5083,11 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     function get_curve_xindex_bounds(xmin,xmax)
         vec = abs(main_scale-xmin);
         ixmin_id = find( vec==min(vec) );
-        
+        ixmin_id = ixmin_id(1);
+        %
         vec = abs(main_scale-xmax);
         ixmax_id = find( vec==min(vec) );
+        ixmax_id = ixmax_id(1);
     end
     function [min_vs, min_vp_vs_ratio, max_vp_vs_ratio, ...
                 min_ro,max_ro, ...
