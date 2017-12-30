@@ -48,7 +48,7 @@ x = 0;
 %
 %% PROGRAM machinery
 %%    ON/OFF Features
-beta_stuff_enable_status   = 'on';
+beta_stuff_enable_status   = 'off';
 if ispc()
     FLAG__PC_features = 'on';
 else
