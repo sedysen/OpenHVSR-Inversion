@@ -6,7 +6,7 @@ Latest Version: v2.0 (beta)
 	It has been extensively tested, however few bugs may still exist.
 	For this reason, I indicated this as a 'beta' version
 
-Last stable version: v1.0
+Last stable version: v2.0.5
 
 A comprehensive user manual is included,
 however, for any suggestion, question or bug-fix, please don't hesitate to contact me at the following emais:
