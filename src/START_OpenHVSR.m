@@ -21,9 +21,13 @@
 %%       August    28 2015            Bugfix: Matlab Tab support (V0 parameter)
 %%       December   5 2017            Minor Bugfix: linspace. (not affecting functionality)
 %% 
-
+%%
+%%       Note: all imput text files are assuming to use UTF-8 encoding
+%%
+%%
 
 %%%-----------------------------
+%feature('DefaultCharacterSet')
 feature('DefaultCharacterSet', 'UTF8')
 
 clear global
@@ -46,6 +50,8 @@ mode = '2D';%%   only 2D (better for 2-D profiles)
 %% some settings
 fontsizeis = 15;
 %%  -----------------------------------------------------------------------
+%%
+%%
 %%
 if strcmp(mode,'2D')
     gui_2D(Matlab_Release,enable_menu,fontsizeis);% routine for 2D geometry

@@ -17,11 +17,11 @@ fprintf('\n');
 for id = 1:N 
     FileNameData = SURVEYS{id,2};%                                         get filename for field data
     FileNamePath = strcat(working_folder, FileNameData);%                  complete path
-
+    
     %% data separator is not set
     if(strcmp(datafile_separator,'none'))
         fprintf('id[%d] %s.\n',id,FileNameData);
-        DATA = load(strcat(working_folder, FileNameData),'-ascii');
+        DATA = load(strcat(working_folder, FileNameData),'-ascii')
     end
     %% data separator is set
     if(~strcmp(datafile_separator,'none'))    
@@ -43,7 +43,7 @@ for id = 1:N
         %     NDAT=char(B(3,1));
         %     NDAT=NDAT(1,8:size(NDAT,2));
         %     NDAT=str2num(NDAT);
-        for i = 1:size(B,1);
+        for i = 1:size(B,1)
             % Finding a corrispondence in header
             % HD = separation between header and data
             %fprintf('line[%d]  %s\n',i,B{i,1})
@@ -67,7 +67,7 @@ for id = 1:N
             end
             fclose(fid);
             clear fid DATA count2 %B
-            load DATA.mat -ascii
+            DATA = load('DATA.mat','-ascii'); %test <<<
             fprintf('  ...Done.\n');   
         else
             msg =[ 'Data evaluation is not possible!  '; ...
@@ -82,7 +82,10 @@ for id = 1:N
         end
     end% read file mode
     
-    %% READ DATA PART    
+    %% READ DATA PART 
+    if isempty(DATA)
+        error('Unable to read the data. This is probably due to an ascii unexpected encoding format. Please Contact Samuel Bignardi: sedysen@gmail.com')
+    end
     ff_scale = DATA(:, datafile_columns(1) );
     hv_curve = DATA(:, datafile_columns(2) );
     
