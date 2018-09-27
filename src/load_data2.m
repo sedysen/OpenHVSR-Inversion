@@ -21,7 +21,7 @@ for id = 1:N
     %% data separator is not set
     if(strcmp(datafile_separator,'none'))
         fprintf('id[%d] %s.\n',id,FileNameData);
-        DATA = load(strcat(working_folder, FileNameData),'-ascii')
+        DATA = load(strcat(working_folder, FileNameData),'-ascii');
     end
     %% data separator is set
     if(~strcmp(datafile_separator,'none'))    
@@ -84,7 +84,9 @@ for id = 1:N
     
     %% READ DATA PART 
     if isempty(DATA)
-        error('Unable to read the data. This is probably due to an ascii unexpected encoding format. Please Contact Samuel Bignardi: sedysen@gmail.com')
+        fprintf('MESSAGE: Unable to read the data. This is probably due to an ascii unexpected encoding format. Please Contact Samuel Bignardi: sedysen@gmail.com. THE PROGRAM WILL BE STOPPED.')
+        fprintf('Please check if your data are ASCII and/or UTF-8.\n')
+        error('stopping the program.')
     end
     ff_scale = DATA(:, datafile_columns(1) );
     hv_curve = DATA(:, datafile_columns(2) );
@@ -97,24 +99,6 @@ for id = 1:N
         stdev = DATA(:, datafile_columns(3) );
         FDAT{id,3} = stdev;
     end
-    
-    %message = strcat('Select input file #',ii);
-    %[FileName,PathName,FilterIndex] = uigetfile(input_filename_extension,message);
-
-    %1. imput field data:  load tt_ee_sant1.txt -ascii;
-    %INfiles{1,ii} = PathName;
-    %INfiles{2,ii} = FileName;
-    
-%     FileName = SURVEYS{id,2};%% get filename for field data
-%     array = load(strcat(working_folder, FileName),'-ascii');
-% 
-%     ff_scale = array(:,1);
-%     hv_curve = array(:,2);
-%     
-%     FDAT{id,1} = ff_scale;
-%     FDAT{id,2} = hv_curve;
-% 
-%     fprintf('id[%d] %s.\n',id,FileName);
 end
 fprintf('[Loading Done]\n');
 

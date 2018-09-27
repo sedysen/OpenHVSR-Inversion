@@ -262,7 +262,7 @@ REFERENCE_MODEL_zpoints  = [];
 %%
 %% MAIN GUI ===============================================================
 appname = 'OpenHVSR-3D';%% Note: the "3D" in appname is used to recognize dimensionality
-version = 'v2.0.2';
+version = 'v2.0.6';
 % Changes respect previous versions:
 %      v2.0     modeling and inversion of surface waves implemented
 
@@ -510,7 +510,7 @@ h_qs_w = uicontrol('FontSize',fontsizeis, ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh]);
 %%          LOCK-TAble
 row = row+1; 
-objw = [0.45];
+objw = 0.45;
 objx = 0.01;
 uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT2_P1, ...
     'String','show Lock Table', ...
@@ -3747,39 +3747,67 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     end
     function INIT_FDATS()
 		fprintf('...init data space.\n')
-        Ndat = size(FDAT,1);
+        Ndata = size(FDAT,1);
+        last_FDAT  = cell( Ndata, 2);
+        best_FDAT = cell( Ndata, 2);
         
-        x_mins = zeros(1,Ndat);
-        x_maxs = zeros(1,Ndat);
-        x_lengths = zeros(1,Ndat);
-        for ij = 1:Ndat
-            x_mins(ij) = min(FDAT{ij,1});
-            x_maxs(ij) = max(FDAT{ij,1});
-            x_lengths(ij) = length(FDAT{ij,1});
-        end
-        last_FDAT = cell( size(FDAT,1), 2);
-        best_FDAT = cell( size(FDAT,1), 2);%last_FDAT;
-        
-        
-        x_min_min = min(x_mins);
-        x_max_max = max(x_maxs);
-        
-        nmax = max(x_lengths);
-        %main_scale = linspace(x_min_min,x_max_max,nmax).';
-        for ij = 1:Ndat% get the first valid mainscale
-            if( ~isempty( FDAT{ij,1} )  )
-                main_scale = FDAT{ij,1};
-                break;
-            end
-        end
-        for ij = 1:Ndat% check wich curve needs Interpolation
-            if( (min(FDAT{ij,1}) ~= x_min_min) || (max(FDAT{ij,1}) ~= x_max_max) || (length(FDAT{ij,1}) ~= nmax) )
-                error('The input data are defined on different x-scales, This is not allowed yet.')
+        %% setup main scale
+        main_scale =[];
+        x_mins     = zeros(1,Ndata);
+        x_maxs    = zeros(1,Ndata);
+        x_lengths = zeros(1,Ndata);
+        for iij = 1:Ndata
+            if( ~isempty( FDAT{iij,1} )  )
+                x_mins(iij)     = min(FDAT{iij,1});
+                x_maxs(iij)    = max(FDAT{iij,1});
+                x_lengths(iij) = length(FDAT{iij,1});
             end
         end
         
-        independent_optimiazation_cicles = zeros(1,Ndat);
+        x_min_min = max(x_mins);% most conservative choice
+        x_max_max = min(x_maxs);
+        nmax           = max(x_lengths);
         
+        % get the main-scale corresponding to the most conservative choice
+        for iij = 1:Ndata% get the first valid mainscale (most conservative)
+            if( ~isempty( FDAT{iij,1} )  )
+                if( (min(FDAT{iij,1}) == x_min_min) && (max(FDAT{iij,1}) == x_max_max) && (length(FDAT{iij,1}) == nmax) )
+                    main_scale = FDAT{iij,1};% found good reference frequency scale
+                    break;
+                end
+            end
+        end
+        
+        % most conservative choice not available: select the first
+        if( isempty( main_scale ) )          
+            fprintf('MESSAGE: Data appares to be defined on different frequency scales\n')
+            fprintf('    Using the frequency scale from the first valid data-file as a reference and\n') 
+            fprintf('    checking all files whether interpolation on a common frequency scale is necessary.\n')
+            for iij = 1:Ndata% get the first valid mainscale (most conservative)
+                if( ~isempty( FDAT{iij,1} )  )
+                    main_scale = FDAT{iij,1};
+                    break;
+                end
+            end
+            if( isempty(main_scale) )% NO main scale can be found
+                fprintf('MESSAGE: NO REFERENCE FREQUENCY SCALE CAN BE FOUND. Contact the developer.\n')
+                error('stopping the program.')
+            end
+            
+            %check for interpolation
+            for iij = 1:Ndata% get the first valid mainscale (most conservative)
+                if(  (FDAT{iij,1}(1)~=main_scale(1)) || (FDAT{iij,1}(end)~=main_scale(end))  || (length(FDAT{iij,1})~=length(main_scale)) )
+                    newhv = spline(FDAT{iij,1},FDAT{iij,2}, main_scale);
+                    FDAT{iij,1} = main_scale;
+                    FDAT{iij,2} = newhv;
+                    fprintf('[%d][%s] was interpolated on a new frequency scale.\n',iij, SURVEYS{iij,2});
+                else
+                    fprintf('[%d][%s] is OK.\n',iij, SURVEYS{iij,2});
+                end
+            end
+        end
+        
+        independent_optimiazation_cicles = zeros(1,Ndata);
         view_min_scale = min(main_scale);
         view_max_scale = max(main_scale);
     end
@@ -4460,7 +4488,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         MDL = get(TB,'Data');
         MDL = MDL(:,1:6);
         OUT1 = single_fwd_model(MDL,x_vec);
-        [oMFit,octrm, ostrm, oer] = get_single_model_misfit(data_1d_to_show, OUT1{2});
+        [oMFit,~,~,~] = get_single_model_misfit(data_1d_to_show, OUT1{2});
         set(holdmisf,'String',num2str(oMFit));
         
         %% draw    
@@ -4487,7 +4515,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             MDL = get(TB,'Data');
             MDL = MDL(:,1:6);
             OUT1 = single_fwd_model(MDL,x_vec);
-            [tMFit,tctrm, tstrm, ter] = get_single_model_misfit(data_1d_to_show, OUT1{2});
+            [tMFit,tctrm, tstrm, ~] = get_single_model_misfit(data_1d_to_show, OUT1{2});
             MDLS{data_1d_to_show}    = MDL;
             
             last_MDLS{data_1d_to_show} = MDL;
@@ -4518,7 +4546,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             MDL = get(TB,'Data');
             MDL = MDL(:,1:6);
             OUT1 = single_fwd_model(MDL,x_vec);
-            [tMFit,tctrm, tstrm, ter] = get_single_model_misfit(data_1d_to_show, OUT1{2});
+            [tMFit,~,~,~] = get_single_model_misfit(data_1d_to_show, OUT1{2});
             set(hnewmisf,'String',num2str(tMFit));
             
             subredrow();
@@ -4972,7 +5000,6 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 
                 if(get(h_realtime,  'Value')==0)% update if a new best model is found
                     Show_survey(hAx_dat);
-
                     hold(hAx_1dprof,'off');
                     draw_1d_profile(hAx_1dprof, vfst_MDLS{data_1d_to_show},'b',1);
                     hold(hAx_1dprof,'on');
@@ -5573,13 +5600,13 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         if valb==6, var2=qsy(:,nlayb); end
         if valb>=7, var2=dafy; end
 
-        if valb==vala & nlayb==nlaya, nlaya==1; nalyb=2; end
+        if valb==vala && nlayb==nlaya; nlaya=1; nalyb=2; end
 
         % lsmooth=str2num(get(hndl2.edit2,'string'));
-        lsmooth = str2num(get(hconf_nsmooth,'string'));
+        lsmooth = str2double(get(hconf_nsmooth,'string'));
         
         %nlvl   =str2num(get(hndl2.edit3,'string'));
-        nlvl   =str2num(get(hconf_nlevels,'string'));
+        nlvl   =str2double(get(hconf_nlevels,'string'));
 
         lim11=min(var1); lim12=max(var1);
         lim21=min(var2); lim22=max(var2);
@@ -5599,14 +5626,15 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 %%S                           er is (weighted misfit)/(somma cumulativa pesi)
         s = misfit_over_sumweight;
         smax=max(s);
-        for i=1:n1
-            for j=1:n2
-                g=min(s(var1>X1(i)-step1*fctr & var1<X1(i)+step1*fctr & var2>X2(j)-step2*fctr & var2<X2(j)+step2*fctr));
+        S = zeros(n2,n1);
+        for ii=1:n1
+            for jj=1:n2
+                g=min(s(var1>X1(ii)-step1*fctr & var1<X1(ii)+step1*fctr & var2>X2(jj)-step2*fctr & var2<X2(jj)+step2*fctr));
                 sizeg=size(g);
                 if sizeg(1)*sizeg(2)>0
-                    S(j,i)=g;
+                    S(jj,ii)=g;
                 else
-                    S(j,i)=smax;
+                    S(jj,ii)=smax;
                 end
             end
         end

@@ -348,7 +348,6 @@ switch Matlab_Release
         hTab_2d_viewer = uitab('Parent',hTabGroup, 'Title','2D Model Viewer');
         hTab_Confidenc = uitab('Parent',hTabGroup, 'Title','Confidence');
         hTab_Sensitivt = uitab('Parent',hTabGroup, 'Title','Sensitivity');
-        
 end
 %%    Panels: locations and sizes 
 Nrowa = 30;
@@ -497,7 +496,7 @@ h_qs_w = uicontrol('FontSize',fontsizeis, ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh]);
 %%          LOCK-TAble
 row = row+1; 
-objw = [0.45];
+objw = 0.45;
 objx = 0.01;
 uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT2_P1, ...
     'String','show Lock Table', ...
@@ -1224,7 +1223,7 @@ publish_gui(h_gui,h10,appname,version);
             logfolder = strcat(working_folder,'logs');
             if(~exist(logfolder,'dir'))% create log folder
                 logfolder_exist = mkdir(logfolder);% 1 yes /0
-                if(logfolder_exist==1); 
+                if(logfolder_exist==1) 
                     fprintf('log folder created.\n'); 
                 else
                     fprintf('log folder creation failed.\n'); 
@@ -1286,10 +1285,10 @@ publish_gui(h_gui,h10,appname,version);
         if(folder_name)
             Nsurveys = size(SURVEYS,1);
             if Nsurveys>0
-                for i = 1:Nsurveys
-                    [p,s,ext]=fileparts(SURVEYS{i,2});
+                for ii = 1:Nsurveys
+                    [~,s,~]=fileparts(SURVEYS{ii,2});
                     fname = strcat(folder_name,'/',s,'_subsurface.txt');
-                    dd = MDLS{i};
+                    dd = MDLS{ii};
                     save(fname,'dd','-ascii'); 
                 end
             end
@@ -1349,7 +1348,7 @@ publish_gui(h_gui,h10,appname,version);
             Nsurveys = size(SURVEYS,1);
             if Nsurveys>0
                 for ir = 1:Nsurveys
-                    [p,s,ext]=fileparts(SURVEYS{ir,2});
+                    [~,s,ext]=fileparts(SURVEYS{ir,2});
                     fname = strcat(folder_name,'/',s,ext);
                     dd =[];
                     for ic = 1:size(FDAT,2)
@@ -1370,7 +1369,7 @@ publish_gui(h_gui,h10,appname,version);
                 fprintf(fid,'\n');
                 fprintf(fid,'\n');
                 for ir = 1:Nsurveys
-                    [p,s,ext]=fileparts(SURVEYS{ir,2});
+                    [~,s,~]=fileparts(SURVEYS{ir,2});
                     % model
                     fname = strcat(folder_name,'/',s,'_subsurface.txt');
                     dd = MDLS{ir};
@@ -1849,7 +1848,7 @@ if isfield(BIN,'VSprofile'); VSprofile = BIN.VSprofile; end
 if isfield(BIN,'X1'); X1 = BIN.X1; end
 if isfield(BIN,'X2'); X2 = BIN.X2; end
 if isfield(BIN,'Zprofile'); Zprofile = BIN.Zprofile; end
-if isfield(BIN,'ans'); ans = BIN.ans; end
+% if isfield(BIN,'ans'); ans = BIN.ans; end
 if isfield(BIN,'appname'); appname = BIN.appname; end
 if isfield(BIN,'basevalue'); basevalue = BIN.basevalue; end
 if isfield(BIN,'basevaluew'); basevaluew = BIN.basevaluew; end
@@ -1998,7 +1997,7 @@ if isfield(BIN,'max_vp_vs_ratio'); max_vp_vs_ratio = BIN.max_vp_vs_ratio; end
 if isfield(BIN,'min_H'); min_H = BIN.min_H; end
 if isfield(BIN,'min_qp_qs_ratio'); min_qp_qs_ratio = BIN.min_qp_qs_ratio; end
 if isfield(BIN,'min_qs'); min_qs = BIN.min_qs; end
-if isfield(BIN,'min_ro'); min_r = BIN.min_ro; end
+if isfield(BIN,'min_ro'); min_ro = BIN.min_ro; end
 if isfield(BIN,'min_vp_vs_ratio'); min_vp_vs_ratio = BIN.min_vp_vs_ratio; end
 if isfield(BIN,'min_vs'); min_vs = BIN.min_vs; end
 if isfield(BIN,'misfit_over_sumweight'); misfit_over_sumweight = BIN.misfit_over_sumweight; end
@@ -2216,11 +2215,6 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         view_max_scale = max(main_scale);
         Show_survey(hAx_dat)
     end
-%%      extra
-    function Menu_extrs_scrennshot(~,~,~)
-        
-        saveas(h_gui,'schreenshot.eps');
-    end
 %%      About
     function Menu_About_Credits(~,~,~)
         msgbox(get(h10,'UserData'),'CREDITS:')   
@@ -2345,7 +2339,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             while (get(hObject,'Value') && (togo > 0) )
 
               iii = iii+1;
-              if(iii == 1); 
+              if(iii == 1) 
                   last_MDLS = MDLS;
               else
                   last_MDLS = perturbe_models(MDLS);
@@ -2360,7 +2354,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
               % qp       last_MDLS{model}(:,6)
               % freq.    FDAT{model,1};
               fullMisfit = 0; fuller = 0;
-              for m = 1:Nsurveys;
+              for m = 1:Nsurveys
                 %% ========================================================
                 % as_Samuel(c,ro,h,q,ex,fref,f)  
                 VP = last_MDLS{m}(:,1);
@@ -2459,14 +2453,14 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             while (get(hObject,'Value') && (togo > 0) )
 
               iii = iii+1;
-              if(iii == 1); 
+              if(iii == 1) 
                   last_MDLS = MDLS;
               else
                   last_MDLS = perturbe_models(MDLS);
               end
 
               fullMisfit = 0; fuller = 0;
-              for m = 1:Nsurveys;
+              for m = 1:Nsurveys
                 %  vp  vs  rho  h  Qp  Qs
                 VP = last_MDLS{m}(:,1);
                 VS = last_MDLS{m}(:,2);
@@ -2814,9 +2808,9 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         warning('Function under debug.')
         prompt = {'Select destination model'};
         def = {num2str(data_1d_to_show)};
-        answer = inputdlg(prompt,'Spread To',1,def)
+        answer = inputdlg(prompt,'Spread To',1,def);
         if(~isempty(answer))
-            destination_id = str2double(answer)
+            destination_id = str2double(answer);
             if (destination_id>0) && (destination_id<=size(SURVEYS,1))
                 MDLS{destination_id} = MDLS{data_1d_to_show};
                 fprintf('Model %d copied to position %d.\n',data_1d_to_show,destination_id)
@@ -2857,7 +2851,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 temp = MDLS{data_1d_to_show};
                 newm = zeros( size(temp,1)+1, size(temp,2));
                 countl = 0;
-                for ll = 1:size(temp,1)-1;% only layers
+                for ll = 1:(size(temp,1)-1)% only layers
                     if(countl<size(newm,1))
                         if (ll~=lid)
                             countl = countl+1;
@@ -2905,7 +2899,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 temp = MDLS{data_1d_to_show};
                 newm = zeros( size(temp,1)-1, size(temp,2));
                 countl = 0;
-                for ll = 1:size(temp,1)-1;% only layers
+                for ll = 1:size(temp,1)-1% only layers
                     if(countl<size(newm,1))
                         if (ll~=dwn)
                             countl = countl+1;
@@ -2984,7 +2978,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                     %fprintf('ITER[%d]\n',iii);
                     iii_global = previous_iii + iii;
                     set(T3_P1_it_count,'String',num2str(iii_global));
-                    if(iii > 1); 
+                    if(iii > 1) 
                         % iii == 1 is always the initial model evaluation
                         %clc
                         
@@ -3091,7 +3085,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                     %fprintf('ITER[%d]\n',iii);
                     iii_global = previous_iii + iii;
                     set(T3_P1_it_count,'String',num2str(iii_global));
-                    if(iii > 1); 
+                    if(iii > 1) 
                         % iii == 1 is always the initial model evaluation
                         %clc
                         last_single_MDL = perturbe_single_model( MDLS{data_1d_to_show} );
@@ -3428,7 +3422,6 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 
             %% others  misfit(f)
             for p = 1:length(SN_parscale)
-                p
                 M0 = MDLS{idx};
                 M0(layer, par_id) = SN_parscale(p);
                 VP = M0(:,1);
@@ -3509,39 +3502,67 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     end
     function INIT_FDATS()
 		fprintf('...init data space.\n')
-        Ndat = size(FDAT,1);
+        Ndata = size(FDAT,1);
+        last_FDAT  = cell( Ndata, 2);
+        best_FDAT = cell( Ndata, 2);
         
-        x_mins = zeros(1,Ndat);
-        x_maxs = zeros(1,Ndat);
-        x_lengths = zeros(1,Ndat);
-        for ij = 1:Ndat
-            x_mins(ij) = min(FDAT{ij,1});
-            x_maxs(ij) = max(FDAT{ij,1});
-            x_lengths(ij) = length(FDAT{ij,1});
-        end
-        last_FDAT = cell( size(FDAT,1), 2);
-        best_FDAT = cell( size(FDAT,1), 2);%last_FDAT;
-        
-        
-        x_min_min = min(x_mins);
-        x_max_max = max(x_maxs);
-        
-        nmax = max(x_lengths);
-        %main_scale = linspace(x_min_min,x_max_max,nmax).';
-        for ij = 1:Ndat% get the first valid mainscale
-            if( ~isempty( FDAT{ij,1} )  )
-                main_scale = FDAT{ij,1};
-                break;
-            end
-        end
-        for ij = 1:Ndat% check wich curve needs Interpolation
-            if( (min(FDAT{ij,1}) ~= x_min_min) || (max(FDAT{ij,1}) ~= x_max_max) || (length(FDAT{ij,1}) ~= nmax) )
-                error('The input data are defined on different x-scales, This is not allowed yet.')
+        %% setup main scale
+        main_scale =[];
+        x_mins     = zeros(1,Ndata);
+        x_maxs    = zeros(1,Ndata);
+        x_lengths = zeros(1,Ndata);
+        for iij = 1:Ndata
+            if( ~isempty( FDAT{iij,1} )  )
+                x_mins(iij)     = min(FDAT{iij,1});
+                x_maxs(iij)    = max(FDAT{iij,1});
+                x_lengths(iij) = length(FDAT{iij,1});
             end
         end
         
-        independent_optimiazation_cicles = zeros(1,Ndat);
+        x_min_min = max(x_mins);% most conservative choice
+        x_max_max = min(x_maxs);
+        nmax           = max(x_lengths);
         
+        % get the main-scale corresponding to the most conservative choice
+        for iij = 1:Ndata% get the first valid mainscale (most conservative)
+            if( ~isempty( FDAT{iij,1} )  )
+                if( (min(FDAT{iij,1}) == x_min_min) && (max(FDAT{iij,1}) == x_max_max) && (length(FDAT{iij,1}) == nmax) )
+                    main_scale = FDAT{iij,1};% found good reference frequency scale
+                    break;
+                end
+            end
+        end
+        
+        % most conservative choice not available: select the first
+        if( isempty( main_scale ) )          
+            fprintf('MESSAGE: Data appares to be defined on different frequency scales\n')
+            fprintf('    Using the frequency scale from the first valid data-file as a reference and\n') 
+            fprintf('    checking all files whether interpolation on a common frequency scale is necessary.\n')
+            for iij = 1:Ndata% get the first valid mainscale (most conservative)
+                if( ~isempty( FDAT{iij,1} )  )
+                    main_scale = FDAT{iij,1};
+                    break;
+                end
+            end
+            if( isempty(main_scale) )% NO main scale can be found
+                fprintf('MESSAGE: NO REFERENCE FREQUENCY SCALE CAN BE FOUND. Contact the developer.\n')
+                error('stopping the program.')
+            end
+            
+            %check for interpolation
+            for iij = 1:Ndata% get the first valid mainscale (most conservative)
+                if(  (FDAT{iij,1}(1)~=main_scale(1)) || (FDAT{iij,1}(end)~=main_scale(end))  || (length(FDAT{iij,1})~=length(main_scale)) )
+                    newhv = spline(FDAT{iij,1},FDAT{iij,2}, main_scale);
+                    FDAT{iij,1} = main_scale;
+                    FDAT{iij,2} = newhv;
+                    fprintf('[%d][%s] was interpolated on a new frequency scale.\n',iij, SURVEYS{iij,2});
+                else
+                    fprintf('[%d][%s] is OK.\n',iij, SURVEYS{iij,2});
+                end
+            end
+        end
+        
+        independent_optimiazation_cicles = zeros(1,Ndata);
         view_min_scale = min(main_scale);
         view_max_scale = max(main_scale);
     end
@@ -4184,7 +4205,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         MDL = get(TB,'Data');
         MDL = MDL(:,1:6);
         OUT1 = single_fwd_model(MDL,x_vec);
-        [oMFit,octrm, ostrm, oer] = get_single_model_misfit(data_1d_to_show, OUT1{2});
+        [oMFit,~,~,~] = get_single_model_misfit(data_1d_to_show, OUT1{2});
         set(holdmisf,'String',num2str(oMFit));
         
         %% draw    
@@ -4211,7 +4232,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             MDL = get(TB,'Data');
             MDL = MDL(:,1:6);
             OUT1 = single_fwd_model(MDL,x_vec);
-            [tMFit,tctrm, tstrm, ter] = get_single_model_misfit(data_1d_to_show, OUT1{2});
+            [tMFit,tctrm, tstrm, ~] = get_single_model_misfit(data_1d_to_show, OUT1{2});
             MDLS{data_1d_to_show}    = MDL;
             
             last_MDLS{data_1d_to_show} = MDL;
@@ -4242,7 +4263,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             MDL = get(TB,'Data');
             MDL = MDL(:,1:6);
             OUT1 = single_fwd_model(MDL,x_vec);
-            [tMFit,tctrm, tstrm, ter] = get_single_model_misfit(data_1d_to_show, OUT1{2});
+            [tMFit,~,~,~] = get_single_model_misfit(data_1d_to_show, OUT1{2});
             set(hnewmisf,'String',num2str(tMFit));
             
             subredrow();
@@ -5049,12 +5070,10 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 
         vmax = max(max(DAft));
 
-        if( (vmax <= 1000) );                  lines = 100: 100 : 1000; end
-        if( (1000 < vmax) && (vmax <= 1900) ); lines = 100: 150 : 1900; end
-        if( (1900 < vmax) && (vmax <= 3100) ); lines = 100: 300 : 3100; end
-        if( (vmax > 3000) );                   lines = 100: 500 : vmax; end
-
-
+        % if( (vmax <= 1000) );                               lines = 100: 100 : 1000; end
+        % if( (1000 < vmax) && (vmax <= 1900) ); lines = 100: 150 : 1900; end
+        % if( (1900 < vmax) && (vmax <= 3100) ); lines = 100: 300 : 3100; end
+        % if( (vmax > 3000) );                                 lines = 100: 500 : vmax; end
         %lines = min(min(DAft)): 100 : max(max(DAft));
         %[C,h] = contour( xi, zi, DAft, lines,'EdgeColor','k','Fill','off');
         %clabel(C,h);
@@ -5249,13 +5268,13 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         if valb==6, var2=qsy(:,nlayb); end
         if valb>=7, var2=dafy; end
 
-        if valb==vala & nlayb==nlaya, nlaya==1; nalyb=2; end
+        if valb==vala && nlayb==nlaya; nlaya=1; nalyb=2; end
 
         % lsmooth=str2num(get(hndl2.edit2,'string'));
-        lsmooth = str2num(get(hconf_nsmooth,'string'));
+        lsmooth = str2double(get(hconf_nsmooth,'string'));
         
         %nlvl   =str2num(get(hndl2.edit3,'string'));
-        nlvl   =str2num(get(hconf_nlevels,'string'));
+        nlvl   =str2double(get(hconf_nlevels,'string'));
 
         lim11=min(var1); lim12=max(var1);
         lim21=min(var2); lim22=max(var2);
@@ -5275,14 +5294,15 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 %%S                           er is (weighted misfit)/(somma cumulativa pesi)
         s = misfit_over_sumweight;
         smax=max(s);
-        for i=1:n1
-            for j=1:n2
-                g=min(s(var1>X1(i)-step1*fctr & var1<X1(i)+step1*fctr & var2>X2(j)-step2*fctr & var2<X2(j)+step2*fctr));
+        S = zeros(n2,n1);
+        for ii=1:n1
+            for jj=1:n2
+                g=min(s(var1>X1(ii)-step1*fctr & var1<X1(ii)+step1*fctr & var2>X2(jj)-step2*fctr & var2<X2(jj)+step2*fctr));
                 sizeg=size(g);
                 if sizeg(1)*sizeg(2)>0
-                    S(j,i)=g;
+                    S(jj,ii)=g;
                 else
-                    S(j,i)=smax;
+                    S(jj,ii)=smax;
                 end
             end
         end
