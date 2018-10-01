@@ -3798,8 +3798,15 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             for iij = 1:Ndata% get the first valid mainscale (most conservative)
                 if(  (FDAT{iij,1}(1)~=main_scale(1)) || (FDAT{iij,1}(end)~=main_scale(end))  || (length(FDAT{iij,1})~=length(main_scale)) )
                     newhv = spline(FDAT{iij,1},FDAT{iij,2}, main_scale);
-                    FDAT{iij,1} = main_scale;
                     FDAT{iij,2} = newhv;
+                    %
+                    if(~isempty(FDAT{iij,3}) )
+                        newEr = spline(FDAT{iij,1},FDAT{iij,3}, main_scale);
+                        FDAT{iij,3} = newEr;
+                    end
+                    %
+                    FDAT{iij,1} = main_scale;% record freq. scale
+                    %
                     fprintf('[%d][%s] was interpolated on a new frequency scale.\n',iij, SURVEYS{iij,2});
                 else
                     fprintf('[%d][%s] is OK.\n',iij, SURVEYS{iij,2});
