@@ -45,13 +45,25 @@ function [FF,HV] = call_Albarello_2011(nmodes, nsmooth, fstep, fmaxS, h,vp,vs,ro
     fprintf(fid,'%g %g %g %g %g %g \n',[   0 vp(i)*1.22 vp(i)*1.22/1.73 2600  qp(i)*2.0 qs(i)*2.0]);
     fclose(fid);
     %fprintf('----\n');
-    !microtrem
+    % !microtrem % Before 2012b
+    status = system('microtrem');% try simpler command
+    if(status==1) % try adding extension
+        status = system('microtrem.exe'); 
+    end
+    if(status==1)% try using full path
+        status = system( strcat(cd,'\microtrem.exe') );
+    end
+    if(status==1)
+        fprintf('Matlab did not find executable: microtrem.exe.\n');
+        fprintf('Program will now stop.\n');
+        error('Please contact Samuel Bignardi. sedysen@gmail.com.');
+    end
     %fprintf('----\n');
     if exist('HVratio','file') ==2
         load HVratio;
         % output:
         FF = HVratio(:,1);
-        HV = smooth(HVratio(:,2),nsmooth);
+        HV = SAM_smooth(HVratio(:,2),nsmooth);
         delete HVratio
     else
         warning('Surf. Waves Simulation cannot be performed.')

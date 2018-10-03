@@ -21,6 +21,7 @@
 %%       August    28 2015            Bugfix: Matlab Tab support (V0 parameter)
 %%       December   5 2017            Minor Bugfix: linspace. (not affecting functionality)
 %%       September 27 2018            Files with different frequency scales are now accepted
+%%       October    2 2018            smooth.m (curve fittin toolbox) included as SAM_smooth.m
 %%
 %%       Note: all imput text files are assuming to use UTF-8 encoding
 %%
@@ -40,7 +41,8 @@ clc
 % chose the best working one of the following configurations. 
 % Matlab_Release = '2010a';
 % Matlab_Release = '2015b';
-Matlab_Release = '2016b';
+% Matlab_Release = '2016b';
+Matlab_Release = '2018b';
 %%  -----------------------------------------------------------------------
 enable_menu = 0;
 %%  -----------------------------------------------------------------------
