@@ -46,13 +46,36 @@ function [FF,HV] = call_Albarello_2011(nmodes, nsmooth, fstep, fmaxS, h,vp,vs,ro
     fclose(fid);
     %fprintf('----\n');
     % !microtrem % Before 2012b
+    % status = 1;
     status = system('microtrem');% try simpler command
+    if(status==0); fprintf('microtrem success!  [1st]\n'); end
+    
     if(status==1) % try adding extension
         status = system('microtrem.exe'); 
+        if(status==0); fprintf('microtrem success!  [2nd]\n'); end
     end
-    if(status==1)% try using full path
-        status = system( strcat(cd,'\microtrem.exe') );
+    
+    if(status==1)% try using full path with current matlab working folder
+        status = system( strcat(pwd,'microtrem.exe') );
+        if(status==0); fprintf('microtrem success!  [3th]\n'); end
     end
+    
+    if(status==1)% try using full path of the calling script
+        current_folder = pwd;
+        ffullpath = mfilename('fullpath');
+        if ~strcmp(ffullpath( (end-1):end) , '.m')
+            ffullpath = ffullpath(1: (end-19));
+        else
+            ffullpath = ffullpath(1: (end-21));
+        end
+        if ~strcmp(current_folder , ffullpath)
+            cd(ffullpath) 
+        end
+        status = system( strcat(pwd,'\microtrem.exe') );
+        if(status==0); fprintf('microtrem success!  [4th]\n'); end
+    end
+    
+    
     if(status==1)
         fprintf('Matlab did not find executable: microtrem.exe.\n');
         fprintf('Program will now stop.\n');

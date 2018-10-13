@@ -23,9 +23,9 @@
 %
 
 function gui_2D(Matlab_Release,enable_menu,fontsizeis)   
-
 close all
 clc
+
 %% to load project
 id ='';
 i = 0;

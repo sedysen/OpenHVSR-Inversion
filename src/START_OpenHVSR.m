@@ -30,10 +30,8 @@
 %%%-----------------------------
 %feature('DefaultCharacterSet')
 feature('DefaultCharacterSet', 'UTF8')
-
-clear global
-clear all
 close all
+clear
 clc
 %%  -----------------------------------------------------------------------
 % During the past, Matworks changed the function managing the creation of
@@ -54,6 +52,19 @@ fontsizeis = 15;
 %%  -----------------------------------------------------------------------
 %%
 %%
+%%
+%% check working folder was properly set
+current_folder = pwd;
+ffullpath = mfilename('fullpath');
+if ~strcmp(ffullpath( (end-1):end) , '.m')
+    ffullpath = ffullpath(1: (end-15));
+else
+    ffullpath = ffullpath(1: (end-17));
+end
+if ~strcmp(current_folder , ffullpath)
+    cd(ffullpath) 
+    fprintf('MESSAGE:: I Forced Working folder to: %s\n',ffullpath)
+end
 %%
 if strcmp(mode,'2D')
     gui_2D(Matlab_Release,enable_menu,fontsizeis);% routine for 2D geometry
