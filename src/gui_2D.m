@@ -250,7 +250,7 @@ REFERENCE_MODEL_zpoints  = [];
 %%
 %% MAIN GUI ===============================================================
 appname = 'OpenHVSR-2D';%% Note: the "2D" in appname is used to recognize dimensionality
-version = 'v2.0.6';
+version = 'v2.0.9';
 % Changes respect previous versions:
 %      v2.0     modeling and inversion of surface waves implemented
 
