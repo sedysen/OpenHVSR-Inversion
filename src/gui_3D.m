@@ -22,7 +22,7 @@
 % Lateral constrained montecarlo inversion of HVSR data
 %
 
-function gui_3D(Matlab_Release,enable_menu,fontsizeis)  
+function gui_3D(enable_menu,fontsizeis)  
 close all
 clc
 
@@ -49,12 +49,12 @@ x = 0;
 %% PROGRAM machinery
 %%    ON/OFF Features
 beta_stuff_enable_status   = 'off';
+USER_PREFERENCE_Move_over_suggestions = 'on';
 if ispc()
     FLAG__PC_features = 'on';
 else
     FLAG__PC_features = 'off';
 end
-
 %%    Default values
 [min_vs, min_vp_vs_ratio, max_vp_vs_ratio, ...
 min_ro,max_ro, ...
@@ -175,6 +175,8 @@ STORED_2d_qs_fits         = {};
 STORED_2d_daf_fits        = {};
 
 Misfit_vs_Iter            = {};
+inversion_is_started__inedipendent= '';
+inversion_is_started__global      = '';
 
 data_1d_to_show           = 0;
 property_1d_to_show       = 0;
@@ -257,15 +259,13 @@ REFERENCE_MODEL_zpoints  = [];
 % sw_nsmooth  = 5;
 % sw_fmax     = 0;%% set later depending on the user
 %% xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-
 %%
 %% MAIN GUI ===============================================================
 appname = 'OpenHVSR-3D';%% Note: the "3D" in appname is used to recognize dimensionality
-version = 'v2.0.9';
+version = 'v3.0.0';
 % Changes respect previous versions:
 %      v2.0     modeling and inversion of surface waves implemented
-
+%      
 DSP = get(0,'ScreenSize');% [left, bottom, width, height]
 main_l = 0.1 * DSP(3);
 main_b = 0.1 * DSP(4);
@@ -332,6 +332,8 @@ uimenu(h10,'Label','Credits','Callback',{@Menu_About_Credits});
 %%
 %%
 %% ************************* INTERFACE OBJECTS ****************************
+%% ABOUT MATLAB RELEASE: Get release and apply release-specific behavior  
+[Matlab_Release,Matlab_Release_num, ~,~] = Pfiles_Function_MATLAB_Release(h_gui);
 %% Tabs
 switch Matlab_Release
     case '2010a'
@@ -387,7 +389,7 @@ basevaluew ='1';
 row = 2;
 objw = [0.3, 0.3];
 objx = dw + [0, objw(1)];
-uicontrol('FontSize',fontsizeis, ...
+hRandx = uicontrol('FontSize',fontsizeis, ...
     'Style','text', ...
     'parent',hT2_P1, ...
     'String','Stat.Distribution', ...
@@ -401,13 +403,13 @@ hRand = uicontrol('FontSize',fontsizeis, ...
 row = row+2;
 objw = [0.15, 0.3, 0.3, 0.2];
 objx = dw + [0, objw(1), sum(objw(1:2)), sum(objw(1:3)) ];
-uicontrol('FontSize',fontsizeis, ...
+hPrcv = uicontrol('FontSize',fontsizeis, ...
     'Style','text', ...
     'parent',hT2_P1, ...
     'String','%variation', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
 
-uicontrol('FontSize',fontsizeis, ...
+hLC = uicontrol('FontSize',fontsizeis, ...
     'Style','text', ...
     'parent',hT2_P1, ...
     'String','Lateral constr. W.', ...
@@ -512,7 +514,7 @@ h_qs_w = uicontrol('FontSize',fontsizeis, ...
 row = row+1; 
 objw = 0.45;
 objx = 0.01;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT2_P1, ...
+hShLockT = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT2_P1, ...
     'String','show Lock Table', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@lock_table_modify});
@@ -545,7 +547,7 @@ h_fref_val = uicontrol('FontSize',fontsizeis, ...
 row = row+1; 
 objw = [0.45, 0.1, 0.1,  0.1,0.1];
 objx = 0.01 + [0, objw(1), sum(objw(1:2)), sum(objw(1:3)) , sum(objw(1:4))];
-uicontrol('FontSize',fontsizeis, ...
+h_scale_txt = uicontrol('FontSize',fontsizeis, ...
     'Style','text', ...
     'parent',hT2_P1, ...
     'String','Freq. range', ...
@@ -575,7 +577,7 @@ h_dscale= uicontrol('FontSize',fontsizeis, ...
 row = row+4; 
 objw = [0.4, 0.3];
 objx = 0.01 + [0, (objw(1) )];
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT2_P1, ...
+h_fwd_bw = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT2_P1, ...
     'String','MODEL (P/S)', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_start_model});
@@ -585,13 +587,11 @@ h_fwd_sw=uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT2_P1, .
     'String','MODEL (SW)', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
     'Callback',{@B_start_model_sw});
-
-
 %%          Inversion 
 row = row+1;
 objw = [0.4, 0.3 0.25];
 objx = 0.01 + [0, (objw(1)),  (sum(objw(1:2)))];
-uicontrol('FontSize',fontsizeis,'Style','togglebutton','parent',hT2_P1, ...
+T2_P1_inv_button_bw = uicontrol('FontSize',fontsizeis,'Style','togglebutton','parent',hT2_P1, ...
     'String','START Inversion (P/S)', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_start_inversion});
@@ -604,19 +604,65 @@ T2_P1_max_it = uicontrol('FontSize',fontsizeis,'Style','edit','parent',hT2_P1, .
     'BackgroundColor', [1 1 1]);
 %
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','togglebutton','parent',hT2_P1, ...
+T2_P1_inv_button_sw = uicontrol('FontSize',fontsizeis,'Style','togglebutton','parent',hT2_P1, ...
     'String','START Inversion (SW)', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Enable',FLAG__PC_features, ...
     'Callback',{@B_start_inversion_SW});
-
+T2_P1_progress = uicontrol('FontSize',fontsizeis,'Style','text','parent',hT2_P1, ...
+    'String','', ...
+    'Units','normalized','Position',[objx(3), objy(row), objw(3), objh]);
 
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT2_P1, ...
+T2_P1_inv_button_lw = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT2_P1, ...
     'String','Automatic Weighting', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_auto_lateral_weights});
-
+%%          mouse over tips
+if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
+    hoveoverstring = sprintf('Select the distribution which the perturbations will obey');
+    set(hRandx,'TooltipString',hoveoverstring)
+    set(hRand,'TooltipString',hoveoverstring)
+    
+    hoveoverstring = sprintf('Range of variation (as percentage) within which to search for a better model\n NOTE: might be further modified by the "Depth-Weighting function" ');
+    set(hPrcv,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Weights to apply to various parameter kinds when performing\n a laterally constrained inversion');
+    set(hLC,'TooltipString',hoveoverstring)
+    
+    hoveoverstring = sprintf('Select which parameters will be perturbed\n and which will not');
+    set(hShLockT,'TooltipString',hoveoverstring)
+    
+    hoveoverstring = sprintf('Attenuation as function of the frequency\n k value in the formula\n Q(f) = Q(1Hz)f^k');
+    set(h_ex_val,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Reference frequency for the formula Q(f) = Q(1Hz)f^k');
+    set(h_fref_val,'TooltipString',hoveoverstring)
+    
+    hoveoverstring = sprintf('This line of controls manages which portion of the HVSR curve is considered\n \n NOTE: This values should not be changed after inversion is started. When a change is necessary, for example to gradually increase the considered frequency span,\n 1) use the ''Files/Save as new project"\n to generate a as new project while retaining the current subsurface model\n 2) perform a new independent inversion using the new parameters');
+    set(h_scale_txt ,'TooltipString',hoveoverstring)  
+    hoveoverstring = sprintf('Minimum frequency to consider (Hz)');
+    set(h_scale_min,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Maximum frequency to consider (Hz)');
+    set(h_scale_max,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Frequency axis discretization (Hz)');
+    set(h_dscale,'TooltipString',hoveoverstring)
+    % modeling
+    hoveoverstring = sprintf('Modeling based on a sub-vertical body-waves propagation assumption.');
+    set(h_fwd_bw,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Modeling based on a surface-waves propagation assumption.\n Lunedei and Albarello (2010),\n DOI: 10.1111/j.1365-246X.2010.04560.x\n (Windows only)');
+    set(h_fwd_sw,'TooltipString',hoveoverstring)
+    % inversion
+    hoveoverstring = sprintf('Inversion based on a sub-vertical body-waves propagation assumption.');
+    set(T2_P1_inv_button_bw,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Inversion based on a surface-waves propagation assumption.\n Lunedei and Albarello (2010),\n DOI: 10.1111/j.1365-246X.2010.04560.x (Windows only)');
+    set(T2_P1_inv_button_sw,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Attempt to automatically determine the weights to be applied\n  to different parameters during the laterally constrained inversion');
+    set(T2_P1_inv_button_lw,'TooltipString',hoveoverstring)
+    %
+    hoveoverstring = sprintf('Number of iterations performed');
+    set(T2_P1_global_it_count,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Number of iterations still to perform');
+    set(T2_P1_max_it,'TooltipString',hoveoverstring)
+end
 %%    Panel-B  Curve-Weighting Function
 pos_panel = [0.325 0.50,  (1-0.325) 0.50];
 hT2_P2 = uipanel('title','Frequence-Weighting Function','parent',hTab_Inversion,'Units','normalized','Position',pos_panel); 
@@ -667,22 +713,21 @@ h_1d_next = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
     'Callback',{@CM_hAx_geo_next});
 
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+h_1d_spreadL = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
     'String','Spread L', ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh], ...
     'Callback',{@CM_hAx_keep_and_spread_left});
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+h_1d_spreadALL = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
     'String','Spread', ...
     'Units','normalized','Position',[objx(4), objy(row), objw(4), objh], ...
     'Callback',{@CM_hAx_keep_and_spread_model});
-
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+h_1d_spreadR = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
     'String','Spread R', ...
     'Units','normalized','Position',[objx(5), objy(row), objw(5), objh], ...
     'Callback',{@CM_hAx_keep_and_spread_right});
 
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+h_1d_disable = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
     'String','Disable', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@CM_hAx_geo_disable});
@@ -691,14 +736,14 @@ uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
     'Callback',{@CM_hAx_geo_enable});
 %% NEW BUTTON, look side effects: CM_hAx_keep_and_spread_to  
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+h_1d_spreadTO = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
     'String','Spread to:', ...
     'Enable','on', ... 
     'Units','normalized','Position',[objx(4), objy(row), objw(4), objh], ...
     'Callback',{@CM_hAx_keep_and_spread_to});
 
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+h_1d_Lock = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
     'String','Lock Model', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_lock_model});
@@ -886,7 +931,52 @@ hAx_MvsIT_hcmenu = uicontextmenu;
 uimenu(hAx_MvsIT_hcmenu, 'Label', 'Edit externally','Callback', {@plot_extern,5});
 hAx_MvsIT = axes('Parent',hT3_P3,'Units', 'normalized','FontSize',fontsizeis,'Position',pos_axes2);%,'uicontextmenu',hAx_MvsIT_hcmenu);
 %
-%% TAB: ======================================================== Section 3D
+%%    mouse over tips
+if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
+    hoveoverstring = sprintf('Go to the previous location');
+    set(h_1d_prev,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Go to the next location');
+    set(h_1d_next,'TooltipString',hoveoverstring)
+    
+    hoveoverstring = sprintf('Copy this subsurface to the previous location (Left)');
+    set(h_1d_spreadL,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Copy this subsurface to the next location (Right)');
+    set(h_1d_spreadR,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Copy this subsurface to ALL locations');
+    set(h_1d_spreadALL,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Copy this subsurface to a custom location');
+    set(h_1d_spreadTO,'TooltipString',hoveoverstring)
+    
+   
+    hoveoverstring = sprintf('Keep the subsurface model at this location fixed');
+    set( h_1d_Lock ,'TooltipString',hoveoverstring)
+    
+    hoveoverstring = sprintf('Disable: do not consider this station in any computation or graphic');
+    set(h_1d_disable,'TooltipString',hoveoverstring)
+    
+    %2D hoveoverstring = sprintf('Insert break:\n at this location the lateral constraint is not enforced');
+    %2D set(h_1d_break,'TooltipString',hoveoverstring)
+   
+    % inversion
+    hoveoverstring = sprintf('Inversion based on a sub-vertical body-waves propagation assumption.\n Only for this station.');
+    set(T3_P1_inv,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Inversion based on a surface-waves propagation assumption.\n Only for this station.\n Lunedei and Albarello (2010),\n DOI: 10.1111/j.1365-246X.2010.04560.x (Windows only)');
+    set(T3_P1_invSW,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Restore the previous model.\n (only once, only right after optimization has stopped)');
+    set(T3_p1_revert,'TooltipString',hoveoverstring)
+     hoveoverstring = sprintf('Switch between:\n checked:   update graphics every iteration (slower)\n unchecked: update graphics only when a better model is found');
+    set(h_realtime,'TooltipString',hoveoverstring)
+    
+    hoveoverstring = sprintf('Station/Location being considered');
+    set(T3_P1_txt,'TooltipString',hoveoverstring)
+    
+    %
+    hoveoverstring = sprintf('Number of iterations performed');
+    set(T3_P1_it_count,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Number of iterations still to perform');
+    set(T3_P1_max_it,'TooltipString',hoveoverstring)
+end
+%% TAB: ======================================================== Section 2D
 %%    Panel-A: Controls
 pos_panel = [0 0,  0.1 1];
 hT4_P1 = uipanel('FontSize',fontsizeis,'parent',hTab_2d_viewer,'Position',pos_panel);
@@ -1012,15 +1102,16 @@ objw = [0.1, 0.1,   0.75];
 gapx = 1-sum(objw)-2*dw;
 objx = 0.01 + [0, objw(1), (sum(objw(1:2)) + gapx)];
 row = 1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT5_PA, ...
+hT5_PA_back = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT5_PA, ...
     'String','<<', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_conf_backX});
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT5_PA, ...
+hT5_PA_next = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT5_PA, ...
     'String','>>', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
     'Callback',{@B_conf_nextX});
-T5_P1_txtx = uicontrol('FontSize',fontsizeis,'Style','text','parent',hT5_PA,'Units','normalized','Position',[objx(3), objy(row), objw(3), objh],'BackgroundColor', [1 1 1]);
+T5_P1_txtx = uicontrol('FontSize',fontsizeis,'Style','text','parent',hT5_PA, ...
+    'Units','normalized','Position',[objx(3), objy(row), objw(3), objh],'BackgroundColor', [1 1 1]);
 
 row = row+1;
 objw = [0.4, 0.4];
@@ -1038,6 +1129,21 @@ hconf_xprop = uicontrol('FontSize',fontsizeis,'Style','listbox','parent',hT5_PA,
     'string',[' Vp'; ' Vs'; ' Ro'; ' H '; ' Qp'; ' Qs'; 'DAF']);
 hconf_xlay = uicontrol('FontSize',fontsizeis,'Style','listbox','parent',hT5_PA, ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), n*objh]);
+%%      mouse over tips
+if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
+    % X-axis
+    hoveoverstring = sprintf('Go to the previous location');
+    set(hT5_PA_back,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Go to the next location');
+    set(hT5_PA_next,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Station/Location being considered on the X-axis');
+    set(T5_P1_txtx,'TooltipString',hoveoverstring)
+    
+    hoveoverstring = sprintf('Elastic Property considered on the X-axis ');
+    set(hconf_xprop,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Layer of the model considered on the X-axis ');
+    set(hconf_xlay,'TooltipString',hoveoverstring)
+end
 %%    Panel-B: Y-axis Objects
 pos_panel = [0.00 0.30,  0.325 0.35];
 dw = 0.01;
@@ -1052,11 +1158,11 @@ gapx = 1-sum(objw)-2*dw;
 objx = 0.01 + [0, objw(1), (sum(objw(1:2)) + gapx)];
 row = 1;
 
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT5_PB, ...
+hT5_PB_back = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT5_PB, ...
     'String','<<', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_conf_backY});
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT5_PB, ...
+hT5_PB_next = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT5_PB, ...
     'String','>>', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
     'Callback',{@B_conf_nextY});
@@ -1078,6 +1184,21 @@ hconf_yprop = uicontrol('FontSize',fontsizeis,'Style','listbox','parent',hT5_PB,
     'string',[' Vp'; ' Vs'; ' Ro'; ' H '; ' Qp'; ' Qs'; 'DAF']);
 hconf_ylay = uicontrol('FontSize',fontsizeis,'Style','listbox','parent',hT5_PB, ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), n*objh]);
+%%      mouse over tips
+if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
+    % Y-axis
+    hoveoverstring = sprintf('Go to the previous location');
+    set(hT5_PB_back,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Go to the next location');
+    set(hT5_PB_next,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Station/Location being considered on the Y-axis');
+    set(T5_P1_txty,'TooltipString',hoveoverstring)
+    
+    hoveoverstring = sprintf('Elastic Property considered on the Y-axis');
+    set(hconf_yprop,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Layer of the model considered on the Y-axis ');
+    set(hconf_ylay,'TooltipString',hoveoverstring)
+end
 %%    Panel-C: more inputs
 pos_panel = [0.00 0.00,  0.325 0.30];
 hT5_PC = uipanel('FontSize',fontsizeis,'parent',hTab_Confidenc,'Position',pos_panel);
@@ -1099,9 +1220,18 @@ hconf_nlevels = uicontrol('FontSize',fontsizeis,'Style','edit','parent',hT5_PC,'
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
 %
 row = row+2;
-uicontrol('FontSize',fontsizeis,'Style','Pushbutton','parent',hT5_PC,'String','Update', ...
+hconf_upd = uicontrol('FontSize',fontsizeis,'Style','Pushbutton','parent',hT5_PC,'String','Update', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@confidence_update_misfit});
+%%      mouse over tips
+if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
+    hoveoverstring = sprintf('Number of color levels');
+    set(hconf_nlevels,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Decide the level of smoothing');
+    set(hconf_nsmooth,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Replot');
+    set(hconf_upd,'TooltipString',hoveoverstring)
+end
 %%    Panel-D: Confidence plot
 pos_panel = [0.325 0.00,  (1-0.325) 1.00];
 pos_axis  = [0.1 0.1 0.8 0.8];
@@ -1122,11 +1252,11 @@ objw = [0.1, 0.1,   0.75];
 gapx = 1-sum(objw)-2*dw;
 objx = 0.01 + [0, objw(1), (sum(objw(1:2)) + gapx)];
 row = 5;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT6_PA, ...
+hT6_PA_back = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT6_PA, ...
     'String','<<', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_sns_back});
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT6_PA, ...
+hT6_PA_next = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT6_PA, ...
     'String','>>', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
     'Callback',{@B_sns_next});
@@ -1171,6 +1301,33 @@ row = row+2;
 uicontrol('FontSize',fontsizeis,'Style','Pushbutton','parent',hT6_PA,'String','Update', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@sensitivity_update_misfit});
+%%      mouse over tips
+if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
+    % X-axis
+    hoveoverstring = sprintf('Go to the previous location');
+    set(hT6_PA_back,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Go to the next location');
+    set(hT6_PA_next,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Station/Location being considered');
+    set(T6_P1_txtx,'TooltipString',hoveoverstring)
+    
+    hoveoverstring = sprintf('Elastic Property considered');
+    set(hsns_xprop,'TooltipString',hoveoverstring)
+    
+    hoveoverstring = sprintf('Layer of the model considered');
+    set(hsns_xlay,'TooltipString',hoveoverstring)
+    
+    hoveoverstring = sprintf('Range of values around the current one\n to be considered (as percentage)');
+    set(hsns_bound,'TooltipString',hoveoverstring)
+    hoveoverstring = sprintf('Discretization step of the range ov values (as percentage)');
+    set(hsns_step ,'TooltipString',hoveoverstring)
+    
+    hoveoverstring = sprintf('Number of color levels');
+    set(hsns_nlevels,'TooltipString',hoveoverstring)
+    
+    hoveoverstring = sprintf('Replot');
+    set(hconf_upd,'TooltipString',hoveoverstring)
+end
 %%    Panel-B: curves
 % pos_panel = [0.40 0.00,  0.60 1.00];
 % pos_axis  = [0.1 0.1 0.8 0.8];
@@ -1186,7 +1343,6 @@ hAx_sns_hcmenu = uicontextmenu;
 uimenu(hAx_sns_hcmenu, 'Label', 'Edit externally','Callback', {@plot_extern,8});
 hAx_sensitivity = axes('Parent',hT6_PC,'Units', 'normalized','Units','normalized','FontSize',fontsizeis,'Position',pos_axis,'uicontextmenu',hAx_sns_hcmenu);
 
-
 %% Initializations before gui publication
 %[fFS,FSraw]=FourierSpectrum(magn,delt,dept,rock); %Compute theoretical Fourier spectrum for target earthquake (see Setup)
 [HQfreq, QHspec] = FourierSpectrum( HQMagnitude,  HQEpicDistance, HQFocalDepth, HQRockRatio);
@@ -1198,14 +1354,13 @@ working_folder = '';
 last_project_name = 'myproject.m';
 last_log_number= 0;
 history
-
-
+%
+%
 publish_gui(h_gui,h10,appname,version);
-
-
+set(h_gui, 'MenuBar', 'none');
+set(h_gui, 'ToolBar', 'none');
 %
 %
-
 %% ************************* GUI CALLBACKS ********************************
 %%   MENU
 %%      Files 
@@ -1293,23 +1448,23 @@ publish_gui(h_gui,h10,appname,version);
             fclose(fid);
             
 			%% logging
-            today = date;
-            logfolder = strcat(working_folder,'logs');
-            if(~exist(logfolder,'dir'))% create log folder
-                logfolder_exist = mkdir(logfolder);% 1 yes /0
-                if(logfolder_exist==1); 
-                    fprintf('log folder created.\n'); 
-                else
-                    fprintf('log folder creation failed.\n'); 
-                end
-            else
-                fprintf('log folder found.\n'); 
-            end
-            logname = strcat(working_folder,'logs/LOG_n',num2str(last_log_number),'_',appname,'_',version,'_',today,'.log');
-            set(0,'DiaryFile',logname)
-            diary(logname);
-            diary on;
-            fprintf('logging on %s\n',get(0,'DiaryFile'))
+%             today = date;
+%             logfolder = strcat(working_folder,'logs');
+%             if(~exist(logfolder,'dir'))% create log folder
+%                 logfolder_exist = mkdir(logfolder);% 1 yes /0
+%                 if(logfolder_exist==1) 
+%                     fprintf('log folder created.\n'); 
+%                 else
+%                     fprintf('log folder creation failed.\n'); 
+%                 end
+%             else
+%                 fprintf('log folder found.\n'); 
+%             end
+%             logname = strcat(working_folder,'logs/LOG_n',num2str(last_log_number),'_',appname,'_',version,'_',today,'.log');
+%             set(0,'DiaryFile',logname)
+%             diary(logname);
+%             diary on;
+%             fprintf('logging on %s\n',get(0,'DiaryFile'))
             
             %% loading stuff
             scriptname = strcat(thispath,file);
@@ -1359,10 +1514,10 @@ publish_gui(h_gui,h10,appname,version);
         if(folder_name)
             Nsurveys = size(SURVEYS,1);
             if Nsurveys>0
-                for i = 1:Nsurveys
-                    [p,s,ext]=fileparts(SURVEYS{i,2});
+                for ii = 1:Nsurveys
+                    [~,s,~]=fileparts(SURVEYS{ii,2});
                     fname = strcat(folder_name,'/',s,'_subsurface.txt');
-                    dd = MDLS{i};
+                    dd = MDLS{ii};
                     save(fname,'dd','-ascii'); 
                 end
             end
@@ -1422,7 +1577,7 @@ publish_gui(h_gui,h10,appname,version);
             Nsurveys = size(SURVEYS,1);
             if Nsurveys>0
                 for ir = 1:Nsurveys
-                    [p,s,ext]=fileparts(SURVEYS{ir,2});
+                    [~,s,ext]=fileparts(SURVEYS{ir,2});
                     fname = strcat(folder_name,'/',s,ext);
                     dd =[];
                     for ic = 1:size(FDAT,2)
@@ -1443,7 +1598,7 @@ publish_gui(h_gui,h10,appname,version);
                 fprintf(fid,'\n');
                 fprintf(fid,'\n');
                 for ir = 1:Nsurveys
-                    [p,s,ext]=fileparts(SURVEYS{ir,2});
+                    [~,s,~]=fileparts(SURVEYS{ir,2});
                     % model
                     fname = strcat(folder_name,'/',s,'_subsurface.txt');
                     dd = MDLS{ir};
@@ -1501,7 +1656,7 @@ publish_gui(h_gui,h10,appname,version);
 
             datname = strcat(thispath,file);
             %save(datname);
-                        save(datname, ...
+                      save(datname, ...
   'file', ...
   'thispath', ...
   'ui_dist', ... 
@@ -1820,14 +1975,19 @@ publish_gui(h_gui,h10,appname,version);
     end
     function Menu_Load_elaboration(~,~,~)
         [file,thispath] = uigetfile('*.mat','Resume Elaboration',strcat(working_folder,'/Elaboration.mat'));
-        datname = strcat(thispath,file);
+        
         if(file ~= 0)
-
+            datname = strcat(thispath,file);
             
             %% load the store data
             BIN = load(datname, '-mat');
 
-%% ========================================================================            
+%% ========================================================================  
+%
+inversion_is_started__inedipendent= 'NA';% From version 3.0.0
+inversion_is_started__global      = 'NA';% From version 3.0.0
+
+
 %% if isfield(BIN,'');  = BIN.; end
 if isfield(BIN,'file'); file = BIN.file; end
 if isfield(BIN,'thispath'); thispath = BIN.thispath; end
@@ -2142,7 +2302,8 @@ if isfield(BIN,'working_folder'); working_folder = BIN.working_folder; end
 if isfield(BIN,'x'); x = BIN.x; end
 if isfield(BIN,'xpositions'); xpositions = BIN.xpositions; end
 if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
-%% ========================================================================            
+%% ========================================================================
+
             %% Update Interface
             set(hRand,    'Value',    BIN.ui_dist);
             set(h_hh_val, 'String',   BIN.ui_hh_pc);
@@ -2175,7 +2336,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             plot__curve_weights(hAx_cwf);
             plot__depth_weights();
             Show_survey(hAx_dat);
-            
+            %
             fprintf('[Elaboration resumed Correctly]\n')
         end
     end
@@ -2203,6 +2364,15 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         %if(size(QHspec,2) == 1); QHspec=QHspec.'; end
     end
     function Menu_Settings_objective(~,~,~)
+        if ~isempty(inversion_is_started__inedipendent)
+	       if(~strcmp(inversion_is_started__inedipendent,''))
+		   quest = 'These parameters must be set before the inversion is started and should not be modified afterwards. Continue?';
+		   answer = questdlg(quest);
+		   if strcmp(answer,'No'); return; end
+		   if strcmp(answer,'Cancel'); return; end
+	       end
+	    end
+        
         prompt = {'Curve Term %','Slope Term %'};
         def = {num2str(Misfit_curve_term_w), num2str(Misfit_slope_term_w)};
         answer = inputdlg(prompt,'Set Misfit Approach',1,def);
@@ -2300,11 +2470,6 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         view_max_scale = max(main_scale);
         Show_survey(hAx_dat)
     end
-%%      extra
-    function Menu_extrs_scrennshot(~,~,~)
-        
-        saveas(h_gui,'schreenshot.eps');
-    end
 %%      About
     function Menu_About_Credits(~,~,~)
         msgbox(get(h10,'UserData'),'CREDITS:')   
@@ -2351,7 +2516,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 misfits = zeros(1,Nmod);
                 nlayers = zeros(1,Nmod);
                 for m = 1:Nmod
-                    [MFitx, erx] = get_single_model_misfit(m, OUT{m,2});
+                    [MFitx, ~,~,~] = get_single_model_misfit(m, OUT{m,2});
                     misfits(m) = MFitx;
                     nlayers(m) = size(MDLS{m},1);
                 end
@@ -2364,35 +2529,35 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 max_lat_dQp = str2double(answer{4});         
                 max_lat_dQs = str2double(answer{5});
                 %
-                if(max_lat_dVp>0); 
+                if(max_lat_dVp>0)
                     www = maxmisf/(   0.5*maxlayr*(max_lat_dVp^2)  );
                     set(h_vp_w, 'String', num2str(www)  );
                 else
                     set(h_vp_w, 'String', '0'  );
                 end
                 %
-                if(max_lat_dVs>0); 
+                if(max_lat_dVs>0)
                     www = maxmisf/(   0.5*maxlayr*(max_lat_dVs^2)  );
                     set(h_vs_w, 'String', num2str(www)  );
                 else
                     set(h_vs_w, 'String', '0'  );
                 end
                 %
-                if(max_lat_dRo>0); 
+                if(max_lat_dRo>0)
                     www = maxmisf/(   0.5*maxlayr*(max_lat_dRo^2)  );
                     set(h_ro_w, 'String', num2str(www)  );
                 else
                     set(h_ro_w, 'String', '0'  );
                 end
                 %
-                if(max_lat_dQp>0); 
+                if(max_lat_dQp>0)
                     www = maxmisf/(   0.5*maxlayr*(max_lat_dQp^2)  );
                     set(h_qp_w, 'String', num2str(www)  );
                 else
                     set(h_qp_w, 'String', '0'  );
                 end
                 %
-                if(max_lat_dQs>0); 
+                if(max_lat_dQs>0)
                     www = maxmisf/(   0.5*maxlayr*(max_lat_dQs^2)  );
                     set(h_qs_w, 'String', num2str(www)  );
                 else
@@ -2401,240 +2566,288 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             end
         end
     end
-    function B_start_inversion(hObject,~,~)
+    function B_start_inversion(~,~,~)
         if(~isempty(FDAT))
-            prev_MDLS = MDLS;
-            setup_dpth_weights();
-
-            %get curve x-ranges ids
-            xmin = str2double( get(h_scale_min,'String') );
-            xmax = str2double( get(h_scale_max,'String') );
-            ddx   = str2double( get(h_dscale,   'String') );
-            %[ixmin_id,ixmax_id] = 
-            get_curve_xindex_bounds(xmin,xmax);
-
-
-            %x_vec = linspace(xmin,xmax,(xmax-xmin)/ddx);
-            nnx = abs(main_scale(ixmax_id)-main_scale(ixmin_id))/ddx; 
-            x_vec = linspace( main_scale(ixmin_id), main_scale(ixmax_id),nnx); 
-
-
-            ex   = str2double( get(h_ex_val,  'String') );
-            fref = str2double( get(h_fref_val,'String') );  
-            iii = 0;
-            set(hObject,'String','STOP')  
-            set(T2_P1_global_it_count,'String',strcat(num2str(global_inversion_step),' So far.'));
-            togo = str2double(get(T2_P1_max_it,'String'));
-            Nsurveys = size(SURVEYS,1);
-            while (get(hObject,'Value') && (togo > 0) )
-
-              iii = iii+1;
-              if(iii == 1); 
-                  last_MDLS = MDLS;
-              else
-                  last_MDLS = perturbe_models(MDLS);
-              end
-
-              %% HERAk's routine translated by Bignardi here ! ================
-              % vp       last_MDLS{model}(:,1)
-              % vs       last_MDLS{model}(:,2)
-              % ro       last_MDLS{model}(:,3)
-              % h        last_MDLS{model}(:,4)
-              % qs       last_MDLS{model}(:,5)
-              % qp       last_MDLS{model}(:,6)
-              % freq.    FDAT{model,1};
-              fullMisfit = 0; fuller = 0;
-              for m = 1:Nsurveys;
-                %% ========================================================
-                % as_Samuel(c,ro,h,q,ex,fref,f)  
-                VP = last_MDLS{m}(:,1);
-                VS = last_MDLS{m}(:,2);
-                RO = last_MDLS{m}(:,3);
-                HH = last_MDLS{m}(:,4);
-                QP = last_MDLS{m}(:,5);
-                QS = last_MDLS{m}(:,6);
-
-                aswave = as_Samuel(VS,RO,HH,QS,ex,fref, x_vec);
-                apwave = as_Samuel(VP,RO,HH,QP,ex,fref, x_vec);
-                last_FDAT{m,1} = FDAT{m,1};
-
-                %warning('interpolation here');
-                hvsr_teo = (aswave./apwave);
-
-                %last_FDAT{m,2} = ( interp1(x_vec, hvsr_teo, main_scale(ixmin_id:ixmax_id) ) ).';
-
-                last_FDAT{m,2} = 0*main_scale;
-                last_FDAT{m,2}(ixmin_id:ixmax_id,1) = ( interp1(x_vec, hvsr_teo, main_scale(ixmin_id:ixmax_id) ) ).';
-                %% ========================================================
-                [DAF] = get_amplification_factor(x_vec,aswave);
-                
-                %% store
-                [Single_Misfit,ctrm,strm,er] = get_single_model_misfit(m, last_FDAT{m,2} );%get_single_model_misfit();
-
-                STORED_2d_vp_fits{m} = [STORED_2d_vp_fits{m}; VP.'];
-                STORED_2d_vs_fits{m} = [STORED_2d_vs_fits{m}; VS.'];
-                STORED_2d_ro_fits{m} = [STORED_2d_ro_fits{m}; RO.'];
-                STORED_2d_hh_fits{m} = [STORED_2d_hh_fits{m}; HH.'];
-                STORED_2d_qp_fits{m} = [STORED_2d_qp_fits{m}; QP.'];
-                STORED_2d_qs_fits{m} = [STORED_2d_qs_fits{m}; QS.'];
-                STORED_2d_daf_fits{m}= [STORED_2d_daf_fits{m}; DAF];
-                %[Single_Misfit, er];
-                STORED_RESULTS_2d_misfit{m} = [STORED_RESULTS_2d_misfit{m}; [Single_Misfit,er]];
-                fullMisfit = fullMisfit + Single_Misfit; 
-                fuller     = fuller + er;
-              end
-              %% ==============================================================
-              global_inversion_step = global_inversion_step+1;
-              set(T2_P1_global_it_count,'String',num2str(global_inversion_step));
-
-	          Rfit   = Regularize();
-              Energy =  fullMisfit + Rfit;
-              fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
-
-              %% profile misfit
-              STORED_RESULTS_2d_misfit_profile = [STORED_RESULTS_2d_misfit_profile; [fullMisfit, fuller, Energy]];
-%                fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
-                if isnan(Energy)==1% then something went wrong and need correction
-                    iii = iii-1;
-                    %
-                    STORED_2d_vp_fits{m} = STORED_2d_vp_fits{m}(1:(end-1),:);
-                    STORED_2d_vs_fits{m} = STORED_2d_vs_fits{m}(1:(end-1),:);
-                    STORED_2d_ro_fits{m} = STORED_2d_ro_fits{m}(1:(end-1),:);
-                    STORED_2d_hh_fits{m} = STORED_2d_hh_fits{m}(1:(end-1),:);
-                    STORED_2d_qp_fits{m} = STORED_2d_qp_fits{m}(1:(end-1),:);
-                    STORED_2d_qs_fits{m} = STORED_2d_qs_fits{m}(1:(end-1),:);
-                    STORED_2d_daf_fits{m}= STORED_2d_daf_fits{m}(1:(end-1),:);
-                    %[Single_Misfit, er];
-                    STORED_RESULTS_2d_misfit{m} = STORED_RESULTS_2d_misfit{m}(1:(end-1),:);
-                    %
-                    global_inversion_step = global_inversion_step-1;
-                    %
-                    STORED_RESULTS_2d_misfit_profile = STORED_RESULTS_2d_misfit_profile(1:(end-1),:);
-                else% inversion step is acceptable
-                    Store_Results(Energy,fullMisfit);
-                    togo = togo-1;
-                    set(T2_P1_max_it,'String', num2str( togo  ) );
-                    fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
+            if get(T2_P1_inv_button_bw,'Value')
+                if ~isempty(inversion_is_started__global)
+                    if(~strcmp(inversion_is_started__global,'BW'))
+                       quest = 'It is not advisable to mix Body and Surface Waves inversions. Continue?';
+                       answer = questdlg(quest);
+                       if strcmp(answer,'No'); return; end
+                       if strcmp(answer,'Cancel'); return; end
+                    end
                 end
-                pause(0.002);
+                bgc = [1 0.5 0.1];
+                set(T2_P1_inv_button_bw,'BackgroundColor',bgc);
+                set(T2_P1_progress,'String','');
+                prev_MDLS = MDLS;
+                setup_dpth_weights();
+
+                %get curve x-ranges ids
+                xmin = str2double( get(h_scale_min,'String') );
+                xmax = str2double( get(h_scale_max,'String') );
+                ddx   = str2double( get(h_dscale,   'String') );
+                %[ixmin_id,ixmax_id] = 
+                get_curve_xindex_bounds(xmin,xmax);
+
+
+                %x_vec = linspace(xmin,xmax,(xmax-xmin)/ddx);
+                nnx = abs(main_scale(ixmax_id)-main_scale(ixmin_id))/ddx; 
+                x_vec = linspace( main_scale(ixmin_id), main_scale(ixmax_id),nnx); 
+
+
+                ex   = str2double( get(h_ex_val,  'String') );
+                fref = str2double( get(h_fref_val,'String') );  
+                iii = 0;
+                set(T2_P1_inv_button_bw,'String','STOP')  
+                set(T2_P1_global_it_count,'String',strcat(num2str(global_inversion_step),' So far.'));
+                togo = str2double(get(T2_P1_max_it,'String'));
+                Nsurveys = size(SURVEYS,1);
+                inversion_is_started__global = 'BW'; 
+                while (get(T2_P1_inv_button_bw,'Value') && (togo > 0) )
+                  iii = iii+1;
+                  if(iii == 1) 
+                      last_MDLS = MDLS;
+                  else
+                      last_MDLS = perturbe_models(MDLS);
+                  end
+
+                  %% HERAk's routine translated by Bignardi here ! ================
+                  % vp       last_MDLS{model}(:,1)
+                  % vs       last_MDLS{model}(:,2)
+                  % ro       last_MDLS{model}(:,3)
+                  % h        last_MDLS{model}(:,4)
+                  % qs       last_MDLS{model}(:,5)
+                  % qp       last_MDLS{model}(:,6)
+                  % freq.    FDAT{model,1};
+                  fullMisfit = 0; fuller = 0;
+                  for m = 1:Nsurveys
+                    %% ========================================================
+                    % as_Samuel(c,ro,h,q,ex,fref,f)  
+                    VP = last_MDLS{m}(:,1);
+                    VS = last_MDLS{m}(:,2);
+                    RO = last_MDLS{m}(:,3);
+                    HH = last_MDLS{m}(:,4);
+                    QP = last_MDLS{m}(:,5);
+                    QS = last_MDLS{m}(:,6);
+
+                    aswave = as_Samuel(VS,RO,HH,QS,ex,fref, x_vec);
+                    apwave = as_Samuel(VP,RO,HH,QP,ex,fref, x_vec);
+                    last_FDAT{m,1} = FDAT{m,1};
+                    
+                    %warning('interpolation here');
+                    hvsr_teo = (aswave./apwave);
+
+                    %last_FDAT{m,2} = ( interp1(x_vec, hvsr_teo, main_scale(ixmin_id:ixmax_id) ) ).';
+
+                    last_FDAT{m,2} = 0*main_scale;
+                    last_FDAT{m,2}(ixmin_id:ixmax_id,1) = ( interp1(x_vec, hvsr_teo, main_scale(ixmin_id:ixmax_id) ) ).';
+                    %% ========================================================
+                    [DAF] = get_amplification_factor(x_vec,aswave);
+
+                    %% store
+                    [Single_Misfit,~,~,er] = get_single_model_misfit(m, last_FDAT{m,2} );
+
+                    STORED_2d_vp_fits{m} = [STORED_2d_vp_fits{m}; VP.'];
+                    STORED_2d_vs_fits{m} = [STORED_2d_vs_fits{m}; VS.'];
+                    STORED_2d_ro_fits{m} = [STORED_2d_ro_fits{m}; RO.'];
+                    STORED_2d_hh_fits{m} = [STORED_2d_hh_fits{m}; HH.'];
+                    STORED_2d_qp_fits{m} = [STORED_2d_qp_fits{m}; QP.'];
+                    STORED_2d_qs_fits{m} = [STORED_2d_qs_fits{m}; QS.'];
+                    STORED_2d_daf_fits{m}= [STORED_2d_daf_fits{m}; DAF];
+                    %[Single_Misfit, er];
+                    STORED_RESULTS_2d_misfit{m} = [STORED_RESULTS_2d_misfit{m}; [Single_Misfit,er]];
+                    fullMisfit = fullMisfit + Single_Misfit; 
+                    fuller     = fuller + er;
+                  end
+                  %% ==============================================================
+                  global_inversion_step = global_inversion_step+1;
+                  set(T2_P1_global_it_count,'String',num2str(global_inversion_step));
+
+                  Rfit   = Regularize();
+                  Energy =  fullMisfit + Rfit;
+                  fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
+
+                  %% profile misfit
+                  STORED_RESULTS_2d_misfit_profile = [STORED_RESULTS_2d_misfit_profile; [fullMisfit, fuller, Energy]];
+    %                fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
+                    if isnan(Energy)==1% then something went wrong and need correction
+                        iii = iii-1;
+                        %
+                        STORED_2d_vp_fits{m} = STORED_2d_vp_fits{m}(1:(end-1),:);
+                        STORED_2d_vs_fits{m} = STORED_2d_vs_fits{m}(1:(end-1),:);
+                        STORED_2d_ro_fits{m} = STORED_2d_ro_fits{m}(1:(end-1),:);
+                        STORED_2d_hh_fits{m} = STORED_2d_hh_fits{m}(1:(end-1),:);
+                        STORED_2d_qp_fits{m} = STORED_2d_qp_fits{m}(1:(end-1),:);
+                        STORED_2d_qs_fits{m} = STORED_2d_qs_fits{m}(1:(end-1),:);
+                        STORED_2d_daf_fits{m}= STORED_2d_daf_fits{m}(1:(end-1),:);
+                        %[Single_Misfit, er];
+                        STORED_RESULTS_2d_misfit{m} = STORED_RESULTS_2d_misfit{m}(1:(end-1),:);
+                        %
+                        global_inversion_step = global_inversion_step-1;
+                        %
+                        STORED_RESULTS_2d_misfit_profile = STORED_RESULTS_2d_misfit_profile(1:(end-1),:);
+                    else% inversion step is acceptable
+                        Store_Results(Energy,fullMisfit);
+                        togo = togo-1;
+                        set(T2_P1_max_it,'String', num2str( togo  ) );
+                        fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
+                    end
+                    pause(0.002);
+                end
+                set(T2_P1_inv_button_bw,'Value',0)
+                set(T2_P1_inv_button_bw,'String','START Inversion (P/S)')
+                bgc = 0.9*[1 1 1];
+                set(T2_P1_inv_button_bw,'BackgroundColor',bgc);
             end
-            set(hObject,'Value',0)
-            set(hObject,'String','START Inversion (P/S)')
         else
             fprintf('No data was loaded. Please load a project.\n')
         end
     end
-    function B_start_inversion_SW(hObject,~,~)
-        if(~isempty(FDAT))
-            prev_MDLS = MDLS;
-            setup_dpth_weights();
-
-            %get curve x-ranges ids
-            xmin = str2double( get(h_scale_min,'String') );
-            xmax = str2double( get(h_scale_max,'String') );
-            ddx   = str2double( get(h_dscale,   'String') );
-            %[ixmin_id,ixmax_id] = 
-            get_curve_xindex_bounds(xmin,xmax);  
-            iii = 0;
-            set(hObject,'String','STOP')  
-            set(T2_P1_global_it_count,'String',strcat(num2str(global_inversion_step),' So far.'));
-            togo = str2double(get(T2_P1_max_it,'String'));
-            Nsurveys = size(SURVEYS,1);
-            while (get(hObject,'Value') && (togo > 0) )
-
-              iii = iii+1;
-              if(iii == 1); 
-                  last_MDLS = MDLS;
-              else
-                  last_MDLS = perturbe_models(MDLS);
-              end
-
-              fullMisfit = 0; fuller = 0;
-              for m = 1:Nsurveys;
-                %  vp  vs  rho  h  Qp  Qs
-                VP = last_MDLS{m}(:,1);
-                VS = last_MDLS{m}(:,2);
-                RO = last_MDLS{m}(:,3);
-                HH = last_MDLS{m}(:,4);
-                QP = last_MDLS{m}(:,5);
-                QS = last_MDLS{m}(:,6);
-                [FF,HV] = call_Albarello_2011(sw_nmodes, sw_nsmooth, ddx, xmax, HH,VP,VS,RO,QP,QS);
-                FF=flipud(FF);
-                HV=flipud(HV);
-
-                last_FDAT{m,1} = main_scale;
-                temphv = 0*main_scale;
-                temphv(ixmin_id:ixmax_id,1) = ( interp1(FF, HV, main_scale(ixmin_id:ixmax_id) ) );
-                last_FDAT{m,2} = temphv;%interp1(FF,HV,main_scale,'spline','extrap');
-                DAF = 0;
-                %% ========================================================
-                
-                %% store
-                [Single_Misfit,ctrm,strm,er] = get_single_model_misfit(m, last_FDAT{m,2} );%get_single_model_misfit();
-
-                STORED_2d_vp_fits{m} = [STORED_2d_vp_fits{m}; VP.'];
-                STORED_2d_vs_fits{m} = [STORED_2d_vs_fits{m}; VS.'];
-                STORED_2d_ro_fits{m} = [STORED_2d_ro_fits{m}; RO.'];
-                STORED_2d_hh_fits{m} = [STORED_2d_hh_fits{m}; HH.'];
-                STORED_2d_qp_fits{m} = [STORED_2d_qp_fits{m}; QP.'];
-                STORED_2d_qs_fits{m} = [STORED_2d_qs_fits{m}; QS.'];
-                STORED_2d_daf_fits{m}= [STORED_2d_daf_fits{m}; DAF];
-                %[Single_Misfit, er];
-                STORED_RESULTS_2d_misfit{m} = [STORED_RESULTS_2d_misfit{m}; [Single_Misfit,er]];
-                fullMisfit = fullMisfit + Single_Misfit; 
-                fuller     = fuller + er;
-              end
-              %% ==============================================================
-              global_inversion_step = global_inversion_step+1;
-              set(T2_P1_global_it_count,'String',num2str(global_inversion_step));
-
-	          Rfit   = Regularize();
-              Energy =  fullMisfit + Rfit;
-              %% profile misfit
-              STORED_RESULTS_2d_misfit_profile = [STORED_RESULTS_2d_misfit_profile; [fullMisfit, fuller, Energy]];
-%                fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
-
-                
-                if isnan(Energy)==1% then something went wrong and need correction
-                    iii = iii-1;
-                    %
-                    STORED_2d_vp_fits{m} = STORED_2d_vp_fits{m}(1:(end-1),:);
-                    STORED_2d_vs_fits{m} = STORED_2d_vs_fits{m}(1:(end-1),:);
-                    STORED_2d_ro_fits{m} = STORED_2d_ro_fits{m}(1:(end-1),:);
-                    STORED_2d_hh_fits{m} = STORED_2d_hh_fits{m}(1:(end-1),:);
-                    STORED_2d_qp_fits{m} = STORED_2d_qp_fits{m}(1:(end-1),:);
-                    STORED_2d_qs_fits{m} = STORED_2d_qs_fits{m}(1:(end-1),:);
-                    STORED_2d_daf_fits{m}= STORED_2d_daf_fits{m}(1:(end-1),:);
-                    %[Single_Misfit, er];
-                    STORED_RESULTS_2d_misfit{m} = STORED_RESULTS_2d_misfit{m}(1:(end-1),:);
-                    %
-                    global_inversion_step = global_inversion_step-1;
-                    %
-                    STORED_RESULTS_2d_misfit_profile = STORED_RESULTS_2d_misfit_profile(1:(end-1),:);
-                    fprintf('WARNING: Inversion step[%d] failed! retrying.\n',(iii+1))
-                else% inversion step is acceptable
-                    Store_Results(Energy,fullMisfit);
-                    togo = togo-1;
-                    set(T2_P1_max_it,'String', num2str( togo  ) );
-                    fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
-                    %pause
+    function B_start_inversion_SW(~,~,~)
+        if get(T2_P1_inv_button_sw,'Value')
+            if(~isempty(FDAT))
+                if ~isempty(inversion_is_started__global)
+                    if(~strcmp(inversion_is_started__global,'SW'))
+                       quest = 'It is not advisable to mix Body and Surface Waves inversions. Continue?';
+                       answer = questdlg(quest);
+                       if strcmp(answer,'No'); return; end
+                       if strcmp(answer,'Cancel'); return; end
+                    end
                 end
-                pause(0.01);
+                bgc = [1 0.5 0.1];
+                set(T2_P1_inv_button_sw,'BackgroundColor',bgc);
+                set(T2_P1_progress,'String','');
+                prev_MDLS = MDLS;
+                setup_dpth_weights();
+
+                %get curve x-ranges ids
+                xmin = str2double( get(h_scale_min,'String') );
+                xmax = str2double( get(h_scale_max,'String') );
+                ddx   = str2double( get(h_dscale,   'String') );
+                %[ixmin_id,ixmax_id] = 
+                get_curve_xindex_bounds(xmin,xmax);  
+                iii = 0;
+                set(T2_P1_inv_button_sw,'String','STOP')  
+                set(T2_P1_global_it_count,'String',strcat(num2str(global_inversion_step),' So far.'));
+                togo = str2double(get(T2_P1_max_it,'String'));
+                Nsurveys = size(SURVEYS,1);
+                inversion_is_started__global = 'SW'; 
+                while (get(T2_P1_inv_button_sw,'Value') && (togo > 0) )
+                  iii = iii+1;
+                  if(iii == 1) 
+                      last_MDLS = MDLS;
+                  else
+                      last_MDLS = perturbe_models(MDLS);
+                  end
+
+                  fullMisfit = 0; fuller = 0;
+                  for m = 1:Nsurveys
+                    %  set(T2_P1_progress,'String',num2str(Nsurveys+1-m));
+                    %  vp  vs  rho  h  Qp  Qs
+                    VP = last_MDLS{m}(:,1);
+                    VS = last_MDLS{m}(:,2);
+                    RO = last_MDLS{m}(:,3);
+                    HH = last_MDLS{m}(:,4);
+                    QP = last_MDLS{m}(:,5);
+                    QS = last_MDLS{m}(:,6);
+                    [FF,HV] = call_Albarello_2011(sw_nmodes, sw_nsmooth, ddx, xmax, HH,VP,VS,RO,QP,QS);
+                    FF=flipud(FF);
+                    HV=flipud(HV);
+
+                    last_FDAT{m,1} = main_scale;
+                    temphv = 0*main_scale;
+                    temphv(ixmin_id:ixmax_id,1) = ( interp1(FF, HV, main_scale(ixmin_id:ixmax_id) ) );
+                    last_FDAT{m,2} = temphv;%interp1(FF,HV,main_scale,'spline','extrap');
+                    DAF = 0;
+                    %% ========================================================
+
+                    %% store
+                    [Single_Misfit,~,~,er] = get_single_model_misfit(m, last_FDAT{m,2} );
+
+                    STORED_2d_vp_fits{m} = [STORED_2d_vp_fits{m}; VP.'];
+                    STORED_2d_vs_fits{m} = [STORED_2d_vs_fits{m}; VS.'];
+                    STORED_2d_ro_fits{m} = [STORED_2d_ro_fits{m}; RO.'];
+                    STORED_2d_hh_fits{m} = [STORED_2d_hh_fits{m}; HH.'];
+                    STORED_2d_qp_fits{m} = [STORED_2d_qp_fits{m}; QP.'];
+                    STORED_2d_qs_fits{m} = [STORED_2d_qs_fits{m}; QS.'];
+                    STORED_2d_daf_fits{m}= [STORED_2d_daf_fits{m}; DAF];
+                    %[Single_Misfit, er];
+                    STORED_RESULTS_2d_misfit{m} = [STORED_RESULTS_2d_misfit{m}; [Single_Misfit,er]];
+                    fullMisfit = fullMisfit + Single_Misfit; 
+                    fuller     = fuller + er;
+                  end
+                  %% ==============================================================
+                  global_inversion_step = global_inversion_step+1;
+                  set(T2_P1_global_it_count,'String',num2str(global_inversion_step));
+
+                  Rfit   = Regularize();
+                  Energy =  fullMisfit + Rfit;
+                  %% profile misfit
+                  STORED_RESULTS_2d_misfit_profile = [STORED_RESULTS_2d_misfit_profile; [fullMisfit, fuller, Energy]];
+    %                fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
+
+
+                    if isnan(Energy)==1% then something went wrong and need correction
+                        iii = iii-1;
+                        %
+                        STORED_2d_vp_fits{m} = STORED_2d_vp_fits{m}(1:(end-1),:);
+                        STORED_2d_vs_fits{m} = STORED_2d_vs_fits{m}(1:(end-1),:);
+                        STORED_2d_ro_fits{m} = STORED_2d_ro_fits{m}(1:(end-1),:);
+                        STORED_2d_hh_fits{m} = STORED_2d_hh_fits{m}(1:(end-1),:);
+                        STORED_2d_qp_fits{m} = STORED_2d_qp_fits{m}(1:(end-1),:);
+                        STORED_2d_qs_fits{m} = STORED_2d_qs_fits{m}(1:(end-1),:);
+                        STORED_2d_daf_fits{m}= STORED_2d_daf_fits{m}(1:(end-1),:);
+                        %[Single_Misfit, er];
+                        STORED_RESULTS_2d_misfit{m} = STORED_RESULTS_2d_misfit{m}(1:(end-1),:);
+                        %
+                        global_inversion_step = global_inversion_step-1;
+                        %
+                        STORED_RESULTS_2d_misfit_profile = STORED_RESULTS_2d_misfit_profile(1:(end-1),:);
+                        fprintf('WARNING: Inversion step[%d] failed! retrying.\n',(iii+1))
+                    else% inversion step is acceptable
+                        Store_Results(Energy,fullMisfit);
+                        togo = togo-1;
+                        set(T2_P1_max_it,'String', num2str( togo  ) );
+                        fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
+                        %pause
+                    end
+
+                %set(T2_P1_inv_button_sw,'String','START Inversion (SW)')
+                    pause(0.02);
+                end
+                set(T2_P1_inv_button_sw,'Value',0)
+                set(T2_P1_inv_button_sw,'String','START Inversion (SW)')
+                bgc = 0.9*[1 1 1];
+                set(T2_P1_inv_button_sw,'BackgroundColor',bgc);
+                set(T2_P1_progress,'String','');
+            else
+                fprintf('No data was loaded. Please load a project.\n')
             end
-            set(hObject,'Value',0)
-            set(hObject,'String','START Inversion (SW)')
-        else
-            fprintf('No data was loaded. Please load a project.\n')
+
         end
     end
 %% TAB-2, Panel-2
     function CM_hAx_cwf_modify(~,~,~)
         L = size(weight_curv,1);
         if(L > 0)
+            if ~isempty(inversion_is_started__inedipendent)
+               if(~strcmp(inversion_is_started__inedipendent,''))
+                   quest = 'These parameters must be set before the inversion is started and should not be modified afterwards. Continue?';
+                   answer = questdlg(quest);
+                   if strcmp(answer,'No'); return; end
+                   if strcmp(answer,'Cancel'); return; end
+               end
+            end
             [boxx,boxy] = getsquare(weight_curv(1,1),weight_curv(L,1));
             drawsquare(hAx_cwf,boxx,boxy);
             
-            [~,value] = ginput(1);% take points
+            %[~,value] = ginput(1);% take points
+            if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
+                [~,value] = sam2018b_ginput(1);
+            else
+                [~,value] = ginput(1);
+            end
             if(value<0); value = 0; end
             
             %% update
@@ -2652,6 +2865,14 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     function CM_set_logaritmic_decreasing(~,~,~)
         L = size(weight_curv,1);
         if(L > 0)
+            if ~isempty(inversion_is_started__inedipendent)
+               if(~strcmp(inversion_is_started__inedipendent,''))
+                   quest = 'These parameters must be set before the inversion is started and should not be modified afterwards. Continue?';
+                   answer = questdlg(quest);
+                   if strcmp(answer,'No'); return; end
+                   if strcmp(answer,'Cancel'); return; end
+               end
+            end
             [boxx,boxy] = getsquare(weight_curv(1,1),weight_curv(L,1));
             drawsquare(hAx_cwf,boxx,boxy);
             
@@ -2679,6 +2900,14 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     end
     function CM_hAx_cwf_reset_to_1(~,~,~)
         if(size(weight_curv,1) > 0)
+            if ~isempty(inversion_is_started__inedipendent)
+               if(~strcmp(inversion_is_started__inedipendent,''))
+                   quest = 'These parameters must be set before the inversion is started and should not be modified afterwards. Continue?';
+                   answer = questdlg(quest);
+                   if strcmp(answer,'No'); return; end
+                   if strcmp(answer,'Cancel'); return; end
+               end
+            end
             weight_curv(:,2) = 1;
             plot__curve_weights(hAx_cwf)
         end
@@ -2699,10 +2928,23 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     function CM_hAx_dwf_modify(~,~,~)
         L = size(weight_dpth,1);
         if(L > 0)
+            if ~isempty(inversion_is_started__inedipendent)
+               if(~strcmp(inversion_is_started__inedipendent,''))
+                   quest = 'These parameters must be set before the inversion is started and should not be modified afterwards. Continue?';
+                   answer = questdlg(quest);
+                   if strcmp(answer,'No'); return; end
+                   if strcmp(answer,'Cancel'); return; end
+               end
+            end
             [boxx,boxy] = getsquare(weight_dpth(1,1),weight_dpth(L,1));
             drawsquare(hAx_dwf,boxx,boxy);
             
-            [~,value] = ginput(1);% take points
+            %[~,value] = ginput(1);% take points
+            if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
+                [~,value] = sam2018b_ginput(1);
+            else
+                [~,value] = ginput(1);
+            end
             if(value<0); value = 0; end
             
             %% update
@@ -2721,6 +2963,14 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     end
     function CM_hAx_dwf_reset_to_1(~,~,~)
         if(size(weight_dpth,1) > 0)
+            if ~isempty(inversion_is_started__inedipendent)
+               if(~strcmp(inversion_is_started__inedipendent,''))
+                   quest = 'These parameters must be set before the inversion is started and should not be modified afterwards. Continue?';
+                   answer = questdlg(quest);
+                   if strcmp(answer,'No'); return; end
+                   if strcmp(answer,'Cancel'); return; end
+               end
+            end
             weight_dpth(:,2) = 1;
             plot__depth_weights()
         end
@@ -2756,7 +3006,12 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         end
     end
     function BT_insert_break(~,~,~)
-        [xval,~] = ginput(1);
+        %[xval,~] = ginput(1);
+        if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
+            [xval,~] = sam2018b_ginput(1);
+        else
+            [xval,~] = ginput(1);
+        end
         %;% take points
         for m = 2:size(SURVEYS,1)
             x0 = SURVEYS{m-1,1}(1);
@@ -2771,7 +3026,12 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         Update_survey_locations(hAx_geo);
     end
     function BT_delete_breaks(~,~,~)
-        [xval,~] = ginput(1);
+        %[xval,~] = ginput(1);
+        if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
+            [xval,~] = sam2018b_ginput(1);
+        else
+            [xval,~] = ginput(1);
+        end
         %;% take points
         for m = 2:size(SURVEYS,1)
             x0 = SURVEYS{m-1,1}(1);
@@ -2900,6 +3160,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     end
 %% TAB-3, Panel-3: model
     function CM_hAx_mod_modify(~,~,~)
+        if(isempty(MDLS)); return; end
         model_manager( get(hTab_mod,'Data') );
         set(hTab_mod,'Data', MDLS{data_1d_to_show});
     end
@@ -3025,7 +3286,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 temp = MDLS{data_1d_to_show};
                 newm = zeros( size(temp,1)+1, size(temp,2));
                 countl = 0;
-                for ll = 1:size(temp,1)-1;% only layers
+                for ll = 1:(size(temp,1)-1)% only layers
                     if(countl<size(newm,1))
                         if (ll~=lid)
                             countl = countl+1;
@@ -3073,7 +3334,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 temp = MDLS{data_1d_to_show};
                 newm = zeros( size(temp,1)-1, size(temp,2));
                 countl = 0;
-                for ll = 1:size(temp,1)-1;% only layers
+                for ll = 1:(size(temp,1)-1)% only layers
                     if(countl<size(newm,1))
                         if (ll~=dwn)
                             countl = countl+1;
@@ -3128,7 +3389,17 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     end
     function B_start_inversion__independently(hObject,~,~)
        if(~isempty(FDAT) && data_1d_to_show)  
-            x_vec = get_x_ranges();
+           if ~isempty(inversion_is_started__inedipendent)
+               if(~strcmp(inversion_is_started__inedipendent,'BW'))
+                   quest = 'It is not advisable to mix Body and Surface Waves inversions. Continue?';
+                   answer = questdlg(quest);
+                   if strcmp(answer,'No'); return; end
+                   if strcmp(answer,'Cancel'); return; end
+               end
+           end
+           bgc = [1 0.5 0.1];
+            set(hObject,'BackgroundColor',bgc);
+           x_vec = get_x_ranges();
 
             %% init
             last_single_MDL = MDLS{data_1d_to_show};
@@ -3146,13 +3417,14 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             togo = str2double(get(T3_P1_max_it,'String'));
             
             if(TO_INVERT(data_1d_to_show) == 1)%                               Assuming model is not locked  
+                inversion_is_started__inedipendent= 'BW';
                 while (get(hObject,'Value') && (togo > 0) )
                     
                     iii = iii+1;
                     %fprintf('ITER[%d]\n',iii);
                     iii_global = previous_iii + iii;
                     set(T3_P1_it_count,'String',num2str(iii_global));
-                    if(iii > 1); 
+                    if(iii > 1) 
                         % iii == 1 is always the initial model evaluation
                         %clc
                         
@@ -3182,7 +3454,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                     %
                     for j = 1:nc; last_FDAT{data_1d_to_show,j} = last_single_FDAT{1,j}; end
                     %           
-                    [Single_Misfit, ctrm, strm, er] = get_single_model_misfit(data_1d_to_show, last_single_FDAT{2} );%get_single_model_misfit();
+                    [Single_Misfit, ctrm, strm, er] = get_single_model_misfit(data_1d_to_show, last_single_FDAT{2} );
                     %fprintf('MOD[%d]   MISFIT[%f]\n',data_1d_to_show,Single_Misfit);
                     %
                     %% results storage           
@@ -3229,11 +3501,22 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
        %set(hAx_geo_hcmenu, 'Visible','on'); 
        set(h_1d_prev,      'Enable','on'); 
        set(h_1d_next,      'Enable','on'); 
-       set(T3_p1_revert,   'Enable','on'); 
+       set(T3_p1_revert,   'Enable','on');
+       bgc = 0.9*[1 1 1];
+        set(hObject,'BackgroundColor',bgc);
     end
     function B_start_inversion__independently_SW(hObject,~,~)
-       if(~isempty(FDAT) && data_1d_to_show)  
-            %%x_vec = 
+       if(~isempty(FDAT) && data_1d_to_show)
+           if ~isempty(inversion_is_started__inedipendent)
+               if(~strcmp(inversion_is_started__inedipendent,'SW'))
+                   quest = 'It is not advisable to mix Body and Surface Waves inversions. Continue?';
+                   answer = questdlg(quest);
+                   if strcmp(answer,'No'); return; end
+                   if strcmp(answer,'Cancel'); return; end
+               end
+           end
+            bgc = [1 0.5 0.1];
+            set(hObject,'BackgroundColor',bgc);
             get_x_ranges();
             xmax = str2double( get(h_scale_max,'String') );
             ddx   = str2double( get(h_dscale,  'String') );
@@ -3253,13 +3536,14 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             togo = str2double(get(T3_P1_max_it,'String'));
             
             if(TO_INVERT(data_1d_to_show) == 1)%                               Assuming model is not locked  
+                inversion_is_started__inedipendent= 'SW';
                 while (get(hObject,'Value') && (togo > 0) )
                     
                     iii = iii+1;
                     %fprintf('ITER[%d]\n',iii);
                     iii_global = previous_iii + iii;
                     set(T3_P1_it_count,'String',num2str(iii_global));
-                    if(iii > 1); 
+                    if(iii > 1) 
                         % iii == 1 is always the initial model evaluation
                         %clc
                         last_single_MDL = perturbe_single_model( MDLS{data_1d_to_show} );
@@ -3301,7 +3585,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                     %
                     for j = 1:nc; last_FDAT{data_1d_to_show,j} = last_single_FDAT{1,j}; end
                     %           
-                    [Single_Misfit, ctrm, strm, er] = get_single_model_misfit(data_1d_to_show, last_single_FDAT{2} );%get_single_model_misfit();
+                    [Single_Misfit, ctrm, strm, er] = get_single_model_misfit(data_1d_to_show, last_single_FDAT{2} );
                     %fprintf('MOD[%d]   MISFIT[%f]\n',data_1d_to_show,Single_Misfit);
                     %
                     %% results storage           
@@ -3318,7 +3602,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                     %
                     togo = togo-1;
                     set(T3_P1_max_it,'String', num2str( togo  ) );
-                    pause(0.002);
+                    pause(0.02);
                 end
                 
                 Show_survey(hAx_dat);
@@ -3349,8 +3633,9 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
        set(h_1d_prev,      'Enable','on'); 
        set(h_1d_next,      'Enable','on'); 
        set(T3_p1_revert,   'Enable','on'); 
-    end
-    
+       bgc = 0.9*[1 1 1];
+       set(hObject,'BackgroundColor',bgc);
+    end    
     function B_revert_1d(~,~,~)
         if(~isempty(FDAT))
             MDLS = prev_MDLS;  
@@ -3370,7 +3655,6 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             fprintf('No data was loaded. Please load a project.\n')
         end
     end
-
     function B_hAx_model_profile(~,~,parameter_id)
         property_1d_to_show = parameter_id;
         
@@ -3383,7 +3667,6 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             draw_1d_profile(hAx_1dprof,      MDLS{data_1d_to_show},'k',1);    
         end
     end
-
 %% TAB-4: =================================================
     function BT_refresh_modelview(~,~,~)
         refresh_models_list2D();
@@ -3662,7 +3945,6 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 
             %% others  misfit(f)
             for p = 1:length(SN_parscale)
-                p
                 M0 = MDLS{idx};
                 M0(layer, par_id) = SN_parscale(p);
                 VP = M0(:,1);
@@ -4287,7 +4569,6 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         drawnow;
     end
 
-
     function setup_curve_weights()
         for d = 1 :size(FDAT,1)
             CW{d}= spline(weight_curv(:,1), weight_curv(:,2), main_scale);
@@ -4374,7 +4655,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         
         %x_vec = get_x_ranges();
         OUT = cell(size(SURVEYS,1),2);
-        for m = 1:size(SURVEYS,1);
+        for m = 1:size(SURVEYS,1)
             % VP VS RO HH QP QS
             vp = MDLS{m}(:,1);
             vs = MDLS{m}(:,2);
@@ -4387,7 +4668,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             OUT{m,2} = HV;
         end
     end
-    function [OUT1] = single_fwd_model(MDL,x_vec)% ,ddx)
+    function [OUT1] = single_fwd_model(MDL,x_vec)
         ex   = str2double( get(h_ex_val,  'String') );
         fref = str2double( get(h_fref_val,'String') );
         
@@ -4411,6 +4692,30 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         OUT1{3}(ixmin_id:ixmax_id,1) = ( interp1(x_vec, apwave, main_scale(ixmin_id:ixmax_id) ) ).';
         OUT1{4} = 0*main_scale;
         OUT1{4}(ixmin_id:ixmax_id,1) = ( interp1(x_vec, aswave, main_scale(ixmin_id:ixmax_id) ) ).';
+    end
+    function [OUT1] = single_fwd_model_SW(MDL)
+        get_x_ranges();
+        xmax = str2double( get(h_scale_max,'String') );
+        ddx   = str2double( get(h_dscale,  'String') );
+        
+        % as_Samuel(c,ro,h,q,ex,fref,f)  
+        VP = MDL(:,1);
+        VS = MDL(:,2);
+        RO = MDL(:,3);
+        HH = MDL(:,4);
+        QP = MDL(:,5);
+        QS = MDL(:,6);
+    
+        [FF,hvsr_teo] = call_Albarello_2011(sw_nmodes, sw_nsmooth, ddx, xmax, HH,VP,VS,RO,QP,QS);% [FF,HV] =
+        %OUT1{1} = FF;
+        %OUT1{2} = HV;
+        
+        OUT1{1} = main_scale;
+        OUT1{2} = 0*main_scale;
+        %% NORMAL
+        OUT1{2}(ixmin_id:ixmax_id,1) = ( interp1(FF, hvsr_teo, main_scale(ixmin_id:ixmax_id) ) ).';
+        OUT1{3} = 0*main_scale;
+        OUT1{4} = 0*main_scale;
     end
     function [x_vec] = get_x_ranges()
         xmin = str2double( get(h_scale_min,'String') );
@@ -4465,9 +4770,14 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             'FontSize',fontsizeis,'Callback',{@B_revert});
         uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Save and exit','Position',[0., 0.6, 1, 0.03], ...
             'FontSize',fontsizeis,'Callback',{@B_save});
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Test correction','Position',[0., 0.5, 1, 0.03]', ...
-            'FontSize',fontsizeis,'Callback',{@B_test});
-
+        hbut_bw = uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Test correction (P/S)','Position',[0., 0.5, 1, 0.03]', ...
+            'FontSize',fontsizeis,'Callback',{@B_test_BW});
+        hbut_sw = uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Test correction (SW)','Position',[0., 0.46, 1, 0.03]', ...
+            'Enable',FLAG__PC_features, ...
+            'FontSize',fontsizeis,'Callback',{@B_test_SW});
+        
+        uicontrol('Parent',P0,'Style','text','Units','normalized','String','Misfit (to minimize)','Position',[0., 0.23,  1.0, 0.03], ...
+            'FontSize',fontsizeis);
         uicontrol('Parent',P0,'Style','text','Units','normalized','String','Before','Position',[0., 0.2,  0.4, 0.03], ...
             'FontSize',fontsizeis);
         holdmisf = uicontrol('Parent',P0,'Style','text','Units','normalized','String','0','Position',[0.4, 0.2,  0.6, 0.03], ...
@@ -4522,7 +4832,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             MDL = get(TB,'Data');
             MDL = MDL(:,1:6);
             OUT1 = single_fwd_model(MDL,x_vec);
-            [tMFit,tctrm, tstrm, ~] = get_single_model_misfit(data_1d_to_show, OUT1{2});
+            [tMFit,~, ~, ~] = get_single_model_misfit(data_1d_to_show, OUT1{2});
             MDLS{data_1d_to_show}    = MDL;
             
             last_MDLS{data_1d_to_show} = MDL;
@@ -4533,7 +4843,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             last_single_FDAT{1,1} = OUT1{1,1};
             last_single_FDAT{1,2} = OUT1{1,2};
             
-            Store_Single_Result(tMFit,MDL,tctrm,tstrm)
+            Store_Single_Result(tMFit,MDL,0,0)
+	    % Store_Single_Result(tMFit,MDL,tctrm,tstrm)
             %set(hnewmisf,'String',num2str(tMFit));
             %%
             
@@ -4541,7 +4852,10 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             
             close(hdiag)
         end
-        function B_test(~,~,~)% save and exit 
+        function B_test_BW(~,~,~)% save and exit 
+            bgc = [1 0.5 0.1];
+            set(hbut_bw,'BackgroundColor',bgc, 'String', 'Working');
+            %
             xmin = str2double( get(h_scale_min,'String') );
             xmax = str2double( get(h_scale_max,'String') );
             ddx   = str2double( get(h_dscale,   'String') );
@@ -4557,8 +4871,32 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             set(hnewmisf,'String',num2str(tMFit));
             
             subredrow();
+            bgc = 0.9*[1 1 1];
+            set(hbut_bw,'BackgroundColor',bgc, 'String', 'Test correction (P/S)');
         end
-        %%
+        function B_test_SW(~,~,~)% save and exit 
+            bgc = [1 0.5 0.1];
+            set(hbut_sw,'BackgroundColor',bgc, 'String', 'Working');
+            %
+            xmin = str2double( get(h_scale_min,'String') );
+            xmax = str2double( get(h_scale_max,'String') );
+            ddx   = str2double( get(h_dscale,   'String') );
+            get_curve_xindex_bounds(xmin,xmax);
+
+            nnx = abs(main_scale(ixmax_id)-main_scale(ixmin_id))/ddx; 
+            x_vec = linspace( main_scale(ixmin_id), main_scale(ixmax_id),nnx); 
+            
+            MDL = get(TB,'Data');
+            MDL = MDL(:,1:6);
+            OUT1 = single_fwd_model_SW(MDL);
+            [tMFit,~,~,~] = get_single_model_misfit(data_1d_to_show, OUT1{2});
+            set(hnewmisf,'String',num2str(tMFit));
+            
+            subredrow();
+            bgc = 0.9*[1 1 1];
+            set(hbut_sw,'BackgroundColor',bgc, 'String' ,'Test correction (SW)');
+        end
+    %
         function subredrow()% -----------------------------------------------------------------------------------------------
             set(hdiag,'CurrentAxes',hAx_mm);
            
@@ -4949,9 +5287,11 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         end
       
     end
-    function [MFit,ctrm, strm, er] = get_single_model_misfit(survey_id, SYM)
-        %% Misfit, curve term, slope term, 
-        ctrm=0; strm=0;
+    function [MFit, curveterm, slopeterm, er] = get_single_model_misfit(survey_id, SYM)
+        % MFit:     misfit, 
+        % ctrm:     curve term, 
+        % strm:     slope term,
+        % er:        misfit divided by the sum of the weights 
         data_curve = FDAT{survey_id,2}(ixmin_id:ixmax_id);
         sint_curve = SYM(ixmin_id:ixmax_id,1);
         weights = (CW{survey_id}).^2;
@@ -4972,16 +5312,15 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         S2 = (DsintDs-DdataDs).^2;
         slopeterm = sum(w2(1:end-1).*S2);%% rescaled
         
-        
-        ratio = curveterm/slopeterm;
-        ctrm = (Misfit_curve_term_w*curveterm);%         weighted curve term
-        strm = (Misfit_slope_term_w *ratio*slopeterm);%  weighted slope term
-        MFit =  ctrm + strm;
+        wctrm = (Misfit_curve_term_w*curveterm);%         weighted curve term
+        wstrm = (Misfit_slope_term_w*slopeterm);%  weighted slope term [181118]
+        MFit =  wctrm + wstrm;
         %fprintf('curve[%f]  slope[%f]\n',ctrm,strm)
         
         
         %MFit = slopeterm;
-        er = MFit/sum(weights);%% Er is the misfit divided by the sum of the weights
+        sumweights = sum(weights);
+        er = MFit/sumweights ;%% Er is the misfit divided by the sum of the weights
     end
     
     function Store_Single_Result(Single_Misfit,MDL,ctrm,strm)
@@ -4998,7 +5337,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             if(Single_Misfit < the_best_energy)
                 %fprintf('     >> new best single-model found.\n')
                 nsofar = size(STORED_RESULTS_1d_misfit{data_1d_to_show}, 1);
-                Misfit_vs_Iter{data_1d_to_show} = [Misfit_vs_Iter{data_1d_to_show}; [nsofar ,Single_Misfit,ctrm, strm,] ]; 
+                Misfit_vs_Iter{data_1d_to_show} = [Misfit_vs_Iter{data_1d_to_show}; [nsofar ,Single_Misfit,ctrm, strm] ]; 
                 %%fprintf('it[%d]-->> %f\n',nsofar,Single_Misfit)
                 
                 nc = length(last_single_FDAT);
@@ -5008,9 +5347,12 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 if(get(h_realtime,  'Value')==0)% update if a new best model is found
                     Show_survey(hAx_dat);
                     hold(hAx_1dprof,'off');
-                    draw_1d_profile(hAx_1dprof, vfst_MDLS{data_1d_to_show},'b',1);
-                    hold(hAx_1dprof,'on');
+                    if(~isempty(vfst_MDLS))
+                        draw_1d_profile(hAx_1dprof, vfst_MDLS{data_1d_to_show},'b',1);
+                        hold(hAx_1dprof,'on');
+                    end
                     draw_1d_profile(hAx_1dprof, MDLS{data_1d_to_show},'k',1);
+                    hold(hAx_1dprof,'on');
                     %pause
                     draw_Misfit_vs_it(h_gui, hAx_MvsIT);
                 end
@@ -5022,11 +5364,14 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             Show_survey(hAx_dat);
             
             hold(hAx_1dprof,'off');
-            draw_1d_profile(hAx_1dprof, vfst_MDLS{data_1d_to_show},'b',1);
-            hold(hAx_1dprof,'on');
+            if(~isempty(vfst_MDLS))
+                draw_1d_profile(hAx_1dprof, vfst_MDLS{data_1d_to_show},'b',1);
+                hold(hAx_1dprof,'on');
+            end
             
             %plot_1d_profile(hAx_1dprof);
             draw_1d_profile(hAx_1dprof, MDLS{data_1d_to_show},'k',1);
+            hold(hAx_1dprof,'on');
         end
     end
 
@@ -5267,25 +5612,33 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     end
     function draw_Misfit_vs_it(figure_handle, axes_handle)
 		set(figure_handle,'CurrentAxes',axes_handle);
-        hold(axes_handle,'off')
-        
+        hold(axes_handle,'off')      
         if(~isempty(Misfit_vs_Iter))
             if(~isempty(Misfit_vs_Iter{data_1d_to_show}))
                 %hold(axes_handle,'on')
-                vmax = 0.01*max(Misfit_vs_Iter{data_1d_to_show}(:,2));
-                graph = Misfit_vs_Iter{data_1d_to_show}(:,2)./vmax;
-                cgraph= Misfit_vs_Iter{data_1d_to_show}(:,3)./vmax;
-                sgraph= Misfit_vs_Iter{data_1d_to_show}(:,4)./vmax;
-                plot(axes_handle,  Misfit_vs_Iter{data_1d_to_show}(:,1),graph,'.-k','LineWidth',3,'MarkerSize',5);
+%                 vmax = 0.01*max(Misfit_vs_Iter{data_1d_to_show}(:,2));
+%                 graph = Misfit_vs_Iter{data_1d_to_show}(:,2)./vmax;
+%                 cgraph= Misfit_vs_Iter{data_1d_to_show}(:,3)./vmax;
+%                 sgraph= Misfit_vs_Iter{data_1d_to_show}(:,4)./vmax;
+                %
+                cgraph= Misfit_vs_Iter{data_1d_to_show}(:,3)/max(Misfit_vs_Iter{data_1d_to_show}(:,3));
+                sgraph= Misfit_vs_Iter{data_1d_to_show}(:,4)/max(Misfit_vs_Iter{data_1d_to_show}(:,4));
+                graph  = Misfit_vs_Iter{data_1d_to_show}(:,2)/max(Misfit_vs_Iter{data_1d_to_show}(:,2));
+                
+                %cgraph= Misfit_curve_term_w * Misfit_vs_Iter{data_1d_to_show}(:,3)/max(Misfit_vs_Iter{data_1d_to_show}(:,3));
+                %sgraph= Misfit_slope_term_w * Misfit_vs_Iter{data_1d_to_show}(:,4)/max(Misfit_vs_Iter{data_1d_to_show}(:,4));
+                %
+                xscal = Misfit_vs_Iter{data_1d_to_show}(:,1);
+                plot(axes_handle, xscal, graph,'.-k','LineWidth',3,'MarkerSize',5);
                 hold(axes_handle,'on')
-                plot(axes_handle,  Misfit_vs_Iter{data_1d_to_show}(:,1),cgraph,'-r','LineWidth',3,'MarkerSize',1);
-                plot(axes_handle,  Misfit_vs_Iter{data_1d_to_show}(:,1),sgraph,'-g','LineWidth',3,'MarkerSize',1);
+                plot(axes_handle,  xscal, cgraph,'-r','LineWidth',3,'MarkerSize',1);
+                plot(axes_handle,  xscal, sgraph,'-g','LineWidth',3,'MarkerSize',1);
                 
                 grid on
                 xlabel(axes_handle,'it, [k]Misfit [r]Curve [g]slope');
                 ylabel(axes_handle,'100 M/M_0');
                 
-                ylim([0 100]);
+                ylim([0 1]);
                 %hold(axes_handle,'off')
             end
         end
@@ -5406,12 +5759,10 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 
         vmax = max(max(DAft));
 
-        if( (vmax <= 1000) );                  lines = 100: 100 : 1000; end
-        if( (1000 < vmax) && (vmax <= 1900) ); lines = 100: 150 : 1900; end
-        if( (1900 < vmax) && (vmax <= 3100) ); lines = 100: 300 : 3100; end
-        if( (vmax > 3000) );                   lines = 100: 500 : vmax; end
-
-
+        % if( (vmax <= 1000) );                  lines = 100: 100 : 1000; end
+        % if( (1000 < vmax) && (vmax <= 1900) ); lines = 100: 150 : 1900; end
+        % if( (1900 < vmax) && (vmax <= 3100) ); lines = 100: 300 : 3100; end
+        % if( (vmax > 3000) );                   lines = 100: 500 : vmax; end
         %lines = min(min(DAft)): 100 : max(max(DAft));
         %[C,h] = contour( xi, zi, DAft, lines,'EdgeColor','k','Fill','off');
         %clabel(C,h);
@@ -5436,13 +5787,14 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         DL(nlay+1) = zlevels(end);%-sum(DH(1:ll))-5;  
     end
 
-
     function get_curve_xindex_bounds(xmin,xmax)
         vec = abs(main_scale-xmin);
         ixmin_id = find( vec==min(vec) );
-        
+        ixmin_id = ixmin_id(1);
+        %
         vec = abs(main_scale-xmax);
         ixmax_id = find( vec==min(vec) );
+        ixmax_id = ixmax_id(1);
     end
     function [min_vs, min_vp_vs_ratio, max_vp_vs_ratio, ...
                 min_ro,max_ro, ...
