@@ -22,9 +22,13 @@
 %%       December   5, 2017            Minor Bugfix: linspace. (not affecting functionality)
 %%       September 27, 2018            Files with different frequency scales are now accepted
 %%       October    2, 2018            smooth.m (curve fittin toolbox) included as SAM_smooth.m
-%%      November 18, 2018           modifies curve and slope terms management in the energy function 
+%%       November 18, 2018           modifies curve and slope terms management in the energy function 
 %%                                              NEW move-over suggestionss
 %%                                              NEW test-function in model_manager for surface-waves
+%%       April 4, 2019           New version 4.0.0 (Beta)
+%%                                              NEW main tab showing the survey map
+%%                                              NEW multiple profiles definition
+%%                                              NEW terrain elevation in profiles
 %%       Note: all imput text files are assuming to use UTF-8 encoding
 %%
 %%
@@ -64,7 +68,7 @@ if strcmp(mode,'2D')
     gui_2D(enable_menu,fontsizeis);% routine for 2D geometry
 end
 if strcmp(mode,'3D')
-    gui_3D(enable_menu,fontsizeis);% routine for 3D geometry
+    gui_3D();% routine for 3D geometry
 end
 
 

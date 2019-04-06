@@ -71,7 +71,7 @@ hold on
 p1 = patch(isosurface(X,Y,Z,V, 5),'FaceColor','red','EdgeColor','none');
 %p1 = patch(isosurface(X,Y,Z,V, 5),'FaceColor','interp','EdgeColor','none');
 isonormals(X,Y,Z,V,p1);
-p2 = patch(isocaps(X,Y,Z,V, 5),'FaceColor','interp','EdgeColor','none');
+p2 = patch(isocaps(X,Y,Z,V, 1),'FaceColor','interp','EdgeColor','none');
 
 
 

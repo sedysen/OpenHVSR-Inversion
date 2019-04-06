@@ -45,10 +45,6 @@ function [XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,n
     Z = reshape( Z, L,1);
     D = reshape( D, L,1);
     
-    
-    
-    
-
     VM = griddata3( X, Y, Z, D, XM,YM,ZM, 'nearest');
     VM = smooth3(VM,'box',5);
     correct_for_surface(meshed_surface);
@@ -95,7 +91,7 @@ function [XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,n
                 for k = 1:size(VM,3)
                     if(ZM(j,i,k) > meshed_surface(j,i))
                         %fprintf('%d %d %d\n',i,j,k)
-                        VM(j,i,k) = 0;
+                        VM(j,i,k) = nan;% FIX
                     end
                 end
             end
@@ -108,7 +104,6 @@ function [XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,n
                 for is = 1:size(meshed_surface,1)
                     for js = 1:size(meshed_surface,2)
                          %fprintf('%d %d\n',is,js)
-                        
                         
                         if( (abs(XM(jv,iv,1)-sfx(is,js))<0.001) && (abs(YM(jv,iv,1)-sfy(is,js))<0.001) )
                             if(isnan(meshed_surface(is,js)))

@@ -20,17 +20,28 @@
 %
 %
 % Lateral constrained montecarlo inversion of HVSR data
+
+
+%% >>> in save the file Profiles is now a cell.  
+% P substituted profile related
+% P.isshown.id <<  data_id_to_show
+
+
 %
 
-function gui_3D(enable_menu,fontsizeis)  
+
+function gui_3D()  
+
 close all
 clc
-
 %% to load project
 id ='';
 i = 0;
 dx= 0;
 x = 0; 
+%
+%
+%
 %%%------------------------------------------------------------------------
 %% NOTES:
 %      hvsr curve is a function of frequence.
@@ -48,13 +59,20 @@ x = 0;
 %
 %% PROGRAM machinery
 %%    ON/OFF Features
-beta_stuff_enable_status   = 'off';
-USER_PREFERENCE_Move_over_suggestions = 'on';
+%190404 beta_stuff_enable_status   = 'off';
+%190404 USER_PREFERENCE_Move_over_suggestions = 'on';
 if ispc()
     FLAG__PC_features = 'on';
 else
     FLAG__PC_features = 'off';
 end
+%% Set core variables
+G = [];
+H = [];
+P = [];
+Pfiles_SET_ONOFF_FEAT%          extra features
+Pfiles__INTERNAL_VARIABLES%     contains private variables
+%
 %%    Default values
 [min_vs, min_vp_vs_ratio, max_vp_vs_ratio, ...
 min_ro,max_ro, ...
@@ -111,10 +129,19 @@ r_reciprocicity = [];                          % (3D) station to station distanc
 receiver_locations     = [];                   % (3D) stations locations          
 cutplanes       = [0,1, 0,1, 0,1];             % (3D) sliders for slicing          
 %isslice         = cutplanes;                  % (3D) coordinates for slicing     
-r_distance_from_profile = 50;                  % (3D) 
-profile_ids     = [];                          % (3D) [id's; x-position, distances from rect] to create a 2D profile
-profile_line    = [];                          % (3D)                                                                 
-dim             = [];
+%r_distance_from_profile = 50;                  % (3D) 
+%
+%
+%% USER_PREFERENCE_interface_objects_fontsize is NEW
+%% P is new
+P.isshown.id      = 0;
+%
+P.profile.id      = 0;
+P.profile_ids     = {};                          % (3D) [id's; x-position, distances from rect] to create a 2D profile: Cell since 190404
+P.profile_line    = {};                          % (3D) :Cell since 190404 
+P.profile_name    = {};                          % (3D) :NEW, Cell since 190404 
+P.profile_onoff   = {};                          % (3D) :NEW, Cell since 190404 
+dim             = [];  
 %
 %
 Misfit_curve_term_w = 0.9;        
@@ -130,8 +157,8 @@ BEST_MISFITS = realmax() * ones(NresultsToKeep,1);
 BEST_ENERGIES= BEST_MISFITS;
 BEST_MODELS  = cell(NresultsToKeep,1);
 
-BEST_SINGLE_MISFIT = {};%{data_1d_to_show}(id) = Single_Misfit;
-BEST_SINGLE_MODELS = {};%{id,data_1d_to_show}  = last_single_MDLS;
+BEST_SINGLE_MISFIT = {};%{P.isshown.id}(id) = Single_Misfit;
+BEST_SINGLE_MODELS = {};%{id,P.isshown.id}  = last_single_MDLS;
 
 %
 % Single measurement optimization
@@ -178,7 +205,7 @@ Misfit_vs_Iter            = {};
 inversion_is_started__inedipendent= '';
 inversion_is_started__global      = '';
 
-data_1d_to_show           = 0;
+% data_1d_to_show           = 0; FIX
 property_1d_to_show       = 0;
 property_23d_to_show      = 0;
 
@@ -200,6 +227,12 @@ n_depth_levels     = 20;
 smoothing_strategy = 3;
 smoothing_radius   = 3;
 viewerview = [ -37.5, 30.0];
+%
+%% Get USER preferences
+USER_PREFERENCE_Move_over_suggestions      = '';
+USER_PREFERENCE_interface_objects_fontsize = 0; 
+USER_PREFERENCE_enable_Matlab_default_menu = 0;
+USER_PREFERENCES
 %
 %%    Target Earthquake
 HQfreq = [];%        fFS,
@@ -261,27 +294,28 @@ REFERENCE_MODEL_zpoints  = [];
 %% xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 %%
 %% MAIN GUI ===============================================================
-appname = 'OpenHVSR-3D';%% Note: the "3D" in appname is used to recognize dimensionality
-version = 'v3.0.0';
+appname = 'OpenHVSR-3D  (BETA)';%% Note: the "3D" in appname is used to recognize dimensionality
+version = 'v4.0.0';
 % Changes respect previous versions:
 %      v2.0     modeling and inversion of surface waves implemented
-%      
+%      v4.0     All tab with new generative code.
+%               new "Main View tab".
+%
 DSP = get(0,'ScreenSize');% [left, bottom, width, height]
 main_l = 0.1 * DSP(3);
 main_b = 0.1 * DSP(4);
 main_w = 0.8 * DSP(3);
 main_h = 0.8 * DSP(4);
-h_gui = figure('Visible','on','OuterPosition',[main_l, main_b, main_w, main_h],'NumberTitle','off');
+%190404 h_gui = figure('Visible','on','OuterPosition',[main_l, main_b, main_w, main_h],'NumberTitle','off');
 h_view_rotation = rotate3d;
 set(h_view_rotation ,'ActionPostCallback',@ViewerPostCallback);
-%fontsizeis = 16;
 %%  Build Interface components.
 %% MENUS
-if enable_menu == 0
-    set(h_gui,'MenuBar','none');    % Hide standard menu bar menus.
+if USER_PREFERENCE_enable_Matlab_default_menu == 0
+    set(H.gui,'MenuBar','none');    % Hide standard menu bar menus.
 end
 %%    File
-h0  = uimenu(h_gui,'Label','Files');
+h0  = uimenu(H.gui,'Label','Files');
 uimenu(h0,'Label','Create/Edit project','Callback',{@Menu_Project_Create}, ...
 'Separator','on');
 uimenu(h0,'Label','Load HVI project', 'Callback',{@Menu_Project_Load});
@@ -298,11 +332,11 @@ uimenu(h0,'Label','Save as new project','Callback',{@Menu_Save_as_newproject_set
 uimenu(h0,'Label','Save Elaboration',  'Callback',{@Menu_Save_elaboration},'Separator','on');
 uimenu(h0,'Label','Resume Elaboration','Callback',{@Menu_Load_elaboration});
 %%    Settings
-h1  = uimenu(h_gui,'Label','Settings');
+h1  = uimenu(H.gui,'Label','Settings');
 uimenu(h1,'Label','Setup','Callback',{@Menu_Settings_Setup});
 uimenu(h1,'Label','Objective Func.','Callback',{@Menu_Settings_objective});
 %%    View
-h5  = uimenu(h_gui,'Label','View');
+h5  = uimenu(H.gui,'Label','View');
 h51 = uimenu(h5,'Label','HVSR');
 uimenu(h51,'Label','View Freq. range','Callback',{@Menu_view_xcurverange_custom});
 uimenu(h51,'Label','Fit view to processed data','Callback',{@Menu_view_xcurverange_fitprocessed});
@@ -324,297 +358,464 @@ uimenu(h5_1,'Label','Jet','Callback', {@Menu_view_cmap_Jet});
 uimenu(h5_1,'Label','Hot','Callback', {@Menu_view_cmap_Hot});
 uimenu(h5_1,'Label','Bone','Callback',{@Menu_view_cmap_Bone});
 %%    Extra
-h7  = uimenu(h_gui,'Label','Extra');
+h7  = uimenu(H.gui,'Label','Extra');
 uimenu(h7,'Label','Schreenshot','Callback',{@funct_saveimage});
 %%    About
-h10  = uimenu(h_gui,'Label','About OpenHVSR');
+h10  = uimenu(H.gui,'Label','About OpenHVSR');
 uimenu(h10,'Label','Credits','Callback',{@Menu_About_Credits});
 %%
 %%
 %% ************************* INTERFACE OBJECTS ****************************
+%% Panels
+Pnl = [];
+Pfiles_PANELS
+
+%190404 hTab_Main      = uitab('v0','Parent',hTabGroup, 'Title','Main View');
 %% ABOUT MATLAB RELEASE: Get release and apply release-specific behavior  
-[Matlab_Release,Matlab_Release_num, ~,~] = Pfiles_Function_MATLAB_Release(h_gui);
-%% Tabs
-switch Matlab_Release
-    case '2010a'
-        str = warning('off', 'MATLAB:uitabgroup:OldVersion');
-        hTabGroup = uitabgroup('v0','Parent',h_gui);
-        warning(str);
-        hTab_Inversion = uitab('v0','Parent',hTabGroup, 'Title','Inversion');
-        hTab_1d_viewer = uitab('v0','Parent',hTabGroup, 'Title','1D Model Viewer');
-        hTab_2d_viewer = uitab('v0','Parent',hTabGroup, 'Title','2D Model Viewer');
-        hTab_Confidenc = uitab('v0','Parent',hTabGroup, 'Title','Confidence');
-        hTab_Sensitivt = uitab('v0','Parent',hTabGroup, 'Title','Sensitivity');
-    case '2015b'
-        str = warning('off', 'MATLAB:uitabgroup:OldVersion');
-        hTabGroup = uitabgroup('Parent',h_gui);
-        warning(str);
-        hTab_Inversion = uitab('Parent',hTabGroup, 'Title','Inversion');
-        hTab_1d_viewer = uitab('Parent',hTabGroup, 'Title','1D Model Viewer');
-        hTab_2d_viewer = uitab('Parent',hTabGroup, 'Title','2D Model Viewer');
-        hTab_Confidenc = uitab('Parent',hTabGroup, 'Title','Confidence');
-        hTab_Sensitivt = uitab('Parent',hTabGroup, 'Title','Sensitivity');
-    otherwise
-        fprintf('Generic Matlab Release mode: %s\n',Matlab_Release)
-        str = warning('off', 'MATLAB:uitabgroup:OldVersion');
-        hTabGroup = uitabgroup('Parent',h_gui);
-        warning(str);
-        hTab_Inversion = uitab('Parent',hTabGroup, 'Title','Inversion');
-        hTab_1d_viewer = uitab('Parent',hTabGroup, 'Title','1D Model Viewer');
-        hTab_2d_viewer = uitab('Parent',hTabGroup, 'Title','2D Model Viewer');
-        hTab_Confidenc = uitab('Parent',hTabGroup, 'Title','Confidence');
-        hTab_Sensitivt = uitab('Parent',hTabGroup, 'Title','Sensitivity');
-end
+[Matlab_Release,Matlab_Release_num, hTabGroup,SelectionChangeOption] = Pfiles_Function_MATLAB_Release(H.gui);
+P.SelectionChangeOption = SelectionChangeOption;
+
+set(H.gui,'visible','on')%% delete FIX
+%
 %%    Panels: locations and sizes 
-Nrowa = 30;
-%% TAB: ========================================================= Inversion
+%% TAB: ============================================================== MAIN: 190404
 %
 %   [AA][BBBBBB]
 %   [AA][BBBBBB]
-%   [AA][CCCCCC]
-%   [AA][CCCCCC]
+%   [AA][BBBBBB]
+%   [AA][BBBBBB]
 %
-%%    Panel-A  Controls
-pos_panel = [0.00 0.00,  0.325 1.00];%0.40 1.00];
-dw = 0.01;
-dh = 0.00;
-objh = 0.9*(1-dh)/Nrowa; % object sizes
-objy = dh + ( (Nrowa-1):-1:0 )*(1/Nrowa);
-hT2_P1 = uipanel('FontSize',fontsizeis,'parent',hTab_Inversion,'Position',pos_panel); 
+create_new_tab('Main View');
+%%     Panels
+H.PANELS{P.tab_id}.A = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units', 'normalized','Position',Pnl.Lay0.A);
+if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.A,'title','A');end
+H.PANELS{P.tab_id}.B = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units','normalized','Position',Pnl.Lay0.B);
+if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.B,'title','B');end
+%%     Objets on panel A
+objh = get_normalheight_on_panel( H.PANELS{P.tab_id}.A, G.main_objh );
+objy = get_normalheight_on_panel( H.PANELS{P.tab_id}.A, G.main_object_levels );
 %
-%%       Objects  
+%%       Objects 
+%%          Navigation
+objw = 1;
+objx = 0;
+row = 1;
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A, ...%H.PANELS{P.tab_id}.A, ...
+    'String','Measuremet Location', ...
+    'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);%% setting weigths for fiele   FIX
+row = row+1;
+T1_PA_wgt_file = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A, ...%H.PANELS{P.tab_id}.A, ...
+    'String',' ', ...
+    'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);%% setting weigths for fiele   FIX
+objw = [0.25,  0.25,  0.25,  0.2];
+objx = [0.0,   0.25,  0.50,  0.8];
+row = row+1;
+T1_PA_wgt_bk = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...%,H.PANELS{P.tab_id}.A, ...
+    'String','<<', ...
+    'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
+    'Callback',{@CB_hAx_geo_back});
+T1_PA_wgt_goto = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...%,H.PANELS{P.tab_id}.A, ...
+    'String','go to', ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
+    'Callback',{@CB_hAx_geo_goto});
+T1_PA_wgt_fw = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...%H.PANELS{P.tab_id}.A, ...
+    'String','>>', ...
+    'Units','normalized','Position',[objx(3), objy(row), objw(3), objh], ...
+    'Callback',{@CB_hAx_geo_next});
+%%          Move Over suggestions
+if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
+    set(T1_PA_wgt_fw,'TooltipString','Next location')
+    set(T1_PA_wgt_goto,'TooltipString','Go to custom location')
+    set(T1_PA_wgt_bk,'TooltipString','Previous location')
+end
+%%          INFO measurements:
+row = row+1;
+objw = [0.25,  0.75];
+objx = [0.0,   0.25];
+row = row+1;
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
+    'Style','text', ...
+    'parent',H.PANELS{P.tab_id}.A, ...
+    'String','File ID:', ...
+    'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
+T1_PC_dataid_txt = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text', ...
+    'parent',H.PANELS{P.tab_id}.A, ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
+    'BackgroundColor', [1 1 1]);
+row = row+1;
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
+    'Style','text', ...
+    'parent',H.PANELS{P.tab_id}.A, ...
+    'String','Data File', ...
+    'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
+T1_PC_datafile_txt = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text', ...
+    'parent',H.PANELS{P.tab_id}.A, ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
+    'BackgroundColor', [1 1 1]);
+%
+row = row+1;
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
+    'Style','text', ...
+    'parent',H.PANELS{P.tab_id}.A, ...
+    'String','Model File', ...
+    'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
+T1_PC_modelfile_txt = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text', ...
+    'parent',H.PANELS{P.tab_id}.A, ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
+    'BackgroundColor', [1 1 1]);
+%
+%%          Profile (if any)
+row = row+3;
+objw = 1;
+objx = 0;
+T1_PA_prof_0 = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
+    'Style','text', ...
+    'parent',H.PANELS{P.tab_id}.A, ...%'parent',H.PANELS{P.tab_id}.A, ...
+    'String','Profiles', ...
+    'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
+row = row+1;
+objw = [0.2, 0.2,   0.195, 0.195, 0.195];
+gapx = 1-sum(objw)-0.005;
+objx = [0, objw(1), (sum(objw(1:2)) + gapx), (sum(objw(1:3)) + gapx) , (sum(objw(1:4)) + gapx)];
+T1_PA_prof_bk = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton', ...
+    'parent',H.PANELS{P.tab_id}.A, ...%'parent',H.PANELS{P.tab_id}.A, ...
+    'String','<<', ...
+    'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
+    'Callback',{@CB_hAx_show_profile_back});
+T1_PA_prof_goto = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton', ...
+    'parent',H.PANELS{P.tab_id}.A, ...%'parent',H.PANELS{P.tab_id}.A, ...
+    'String','go to', ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
+    'Callback',{@CB_hAx_show_profile_goto});
+T1_PA_prof_fw = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton', ...
+    'parent',H.PANELS{P.tab_id}.A, ...%'parent',H.PANELS{P.tab_id}.A, ...
+    'String','>>', ...
+    'Units','normalized','Position',[objx(3), objy(row), objw(3), objh], ...
+    'Callback',{@CB_hAx_show_profile_next});
+%
+T1_PA_prof_add = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton', ...
+    'parent',H.PANELS{P.tab_id}.A, ...%'parent',H.PANELS{P.tab_id}.A, ...
+    'String','add', ...
+    'Units','normalized','Position',[objx(4), objy(row), objw(4), objh], ...
+    'Callback',{@CB_hAx_profile_addrec});
+T1_PA_prof_rem = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton', ...
+    'parent',H.PANELS{P.tab_id}.A, ...%'parent',H.PANELS{P.tab_id}.A, ...
+    'String','remove', ...
+    'Units','normalized','Position',[objx(5), objy(row), objw(5), objh], ...
+    'Callback',{@CB_hAx_profile_remrec});
+%%          INFO profile  
+row = row+1;
+objw = [0.75,  0.25];
+objx = [0.0,   0.75];
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
+    'Style','text', ...
+    'parent',H.PANELS{P.tab_id}.A, ...
+    'String','Number of profiles', ...
+    'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
+T1_PC_n_of_profiles_txt = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text', ...
+    'parent',H.PANELS{P.tab_id}.A, ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
+    'BackgroundColor', [1 1 1]);
+row = row+1;
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
+    'Style','text', ...
+    'parent',H.PANELS{P.tab_id}.A, ...
+    'String','Active profile', ...
+    'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
+T1_PC_active_profiles_txt = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text', ...
+    'parent',H.PANELS{P.tab_id}.A, ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
+    'BackgroundColor', [1 1 1]);
+%%          Move Over suggestions
+if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
+    tipstring = sprintf('Profile Creation: (on this Tab)\n1) Define profiles by right-clicking on the map.\n2) Click to set the profile''s start point.\n3) Click again to set the profile''s end point.\n4) Include stations by entering the desired distance from profile.\n5) Use add/remove buttons to include/exclude single stations.\n \nProfile Visualization: (on "2D views" Tab)\n1) Select a profile to be shown using the [-][->][+] buttons.\n2) Select a the property to be shown using buttons on the rigth.');
+    set(T1_PA_prof_0,'TooltipString',tipstring)
+    set(T1_PA_prof_fw,'TooltipString',sprintf('Next profile.\nEnter the profile investigation mode.\nVisualize the profile to inspect which stations are included\nand which are not.'))
+    set(T1_PA_prof_bk,'TooltipString',sprintf('Previous profile\nEnter the profile investigation mode.\nVisualize the profile to inspect which stations are included\nand which are not.'))
+    set(T1_PA_prof_goto,'TooltipString',sprintf('Go to specific profile\nEnter the profile investigation mode.\nVisualize the profile to inspect which stations are included\nand which are not.'))
+    
+    
+    set(T1_PA_prof_add,'TooltipString','Add single location to the selected profile')
+    set(T1_PA_prof_rem,'TooltipString','Remove single location from the selected profile')
+end
+%
+% 
+%
+%%     Objets on panel B
+%%       MAP View
+% pos_panel = [0.325 0.20,  (1-0.325) 0.80];
+hAx_maingeo_hcmenu = uicontextmenu;
+uimenu(hAx_maingeo_hcmenu, 'Label', 'Show',   'Callback', @CM_hAx_geo_show);
+uimenu(hAx_maingeo_hcmenu, 'Label', 'Define 2D profile',    'Callback', {@define_Profile}, 'Separator','on');
+uimenu(hAx_maingeo_hcmenu, 'Label', 'Discard  a profile',    'Callback', {@reset_one_Profile});
+uimenu(hAx_maingeo_hcmenu, 'Label', 'Discard  ALL profiles',    'Callback', {@reset_Profile});
+%
+%uimenu(hAx_geo_hcmenu, 'Label', 'Disable','Callback', @CM_hAx_geo_disable);
+%uimenu(hAx_geo_hcmenu, 'Label', 'Enable', 'Callback', @CM_hAx_geo_enable);
+uimenu(hAx_maingeo_hcmenu, 'Label', 'Edit externally',    'Callback', {@plot_extern,3}, 'Separator','on');
+pos_axes  = [0.1 0.1 0.8 0.8];
+hAx_main_geo= axes('Parent',H.PANELS{P.tab_id}.B,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',pos_axes,'uicontextmenu',hAx_maingeo_hcmenu);
+%% TAB-1: ======================================================= Inversion
+%
+%   [AA][BBBBBB]
+%   [AA][BBBBBB]
+%   [AA][BBBBBB]
+%   [AA][BBBBBB]
+%
+create_new_tab('Inversion');
+%%set(H.TABS(P.tab_id),'ButtonDownFcn',{@CB_TAB_main_view_update})
+%%     Panels
+H.PANELS{P.tab_id}.A = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units', 'normalized','Position',Pnl.Lay0.A);
+if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.A,'title','A');end
+H.PANELS{P.tab_id}.B = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units','normalized','Position',Pnl.Lay0.B);
+if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.B,'title','B');end
+%
+%%     Objets on panel A
+objh = get_normalheight_on_panel( H.PANELS{P.tab_id}.A, G.main_objh );
+objy = get_normalheight_on_panel( H.PANELS{P.tab_id}.A, G.main_object_levels );
+%
+%%       Objects 
 %%          random method
+row = 1;
 basevalue = '5';
 basevaluew ='1';
-row = 2;
-objw = [0.3, 0.3];
-objx = dw + [0, objw(1)];
-hRandx = uicontrol('FontSize',fontsizeis, ...
+row = row+4;
+objw = [0.3, 0.7];
+objx = [0.0, 0.3];
+hRandx = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','text', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String','Stat.Distribution', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-hRand = uicontrol('FontSize',fontsizeis, ...
-    'Style','listbox', ...
-    'parent',hT2_P1, ...
+hRand = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
+    'Style','popup', ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String',['Uniform '; 'Gaussian'], ...
-    'Units','normalized','Position',[objx(2), objy(row), objw(2), 2*objh]);
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), 2*objh] );
 %%          texts
 row = row+2;
-objw = [0.15, 0.3, 0.3, 0.2];
-objx = dw + [0, objw(1), sum(objw(1:2)), sum(objw(1:3)) ];
-hPrcv = uicontrol('FontSize',fontsizeis, ...
+objw = [0.3, 0.25, 0.25, 0.2];
+objx = [0, objw(1), sum(objw(1:2)), sum(objw(1:3)) ];
+hPrcv = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','text', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String','%variation', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
 
-hLC = uicontrol('FontSize',fontsizeis, ...
+hLC = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','text', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String','Lateral constr. W.', ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh]);
 %%          Thick.
 row = row+1; 
-uicontrol('FontSize',fontsizeis, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','text', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String','Thk.', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-h_hh_val = uicontrol('FontSize',fontsizeis, ...
+h_hh_val = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String',basevalue, ...
-    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);%, ...
+%     'Callback',{@CB_Set_HH_percent});
 row = row+1;
-uicontrol('FontSize',fontsizeis, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','text', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String','Vp', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-h_vp_val = uicontrol('FontSize',fontsizeis, ...
+h_vp_val = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String',basevalue, ...
-    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
-h_vp_w = uicontrol('FontSize',fontsizeis, ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);%, ...
+%     'Callback',{@CB_Set_VP_percent});
+h_vp_w = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String',basevaluew, ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh]);
 %%          Vs
 row = row+1; 
-uicontrol('FontSize',fontsizeis, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','text', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String','Vs', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-h_vs_val = uicontrol('FontSize',fontsizeis, ...
+h_vs_val = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String',basevalue, ...
-    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
-h_vs_w = uicontrol('FontSize',fontsizeis, ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);%, ...
+%    'Callback',{@CB_Set_VS_percent});
+h_vs_w = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String',basevaluew, ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh]);
 %%          Ro
 row = row+1; 
-uicontrol('FontSize',fontsizeis, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','text', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String','Rho', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-h_ro_val = uicontrol('FontSize',fontsizeis, ...
+h_ro_val = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String',basevalue, ...
-    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
-h_ro_w = uicontrol('FontSize',fontsizeis, ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);%, ...
+%     'Callback',{@CB_Set_RO_percent});
+h_ro_w = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String',basevaluew, ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh]);
 %%          Qp
 row = row+1; 
-uicontrol('FontSize',fontsizeis, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','text', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String','Qp', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-h_qp_val = uicontrol('FontSize',fontsizeis, ...
+h_qp_val = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String',basevalue, ...
-    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
-h_qp_w = uicontrol('FontSize',fontsizeis, ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);%, ...
+%    'Callback',{@CB_Set_QP_percent});
+h_qp_w = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String',basevaluew, ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh]);
 %%          Qs
 row = row+1; 
-uicontrol('FontSize',fontsizeis, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','text', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String','Qs', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-h_qs_val = uicontrol('FontSize',fontsizeis, ...
+h_qs_val = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String',basevalue, ...
-    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
-h_qs_w = uicontrol('FontSize',fontsizeis, ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);%, ...
+%      'Callback',{@CB_Set_QS_percent});
+h_qs_w = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String',basevaluew, ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh]);
 %%          LOCK-TAble
 row = row+1; 
-objw = 0.45;
-objx = 0.01;
-hShLockT = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT2_P1, ...
+objw = 1;
+objx = 0;
+hShLockT = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','show Lock Table', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@lock_table_modify});
 %%          ex, fref
 row = row+4;  
-objw = [0.45, 0.3];
-objx = 0.01 + [0, objw(1)];
-uicontrol('FontSize',fontsizeis, ...
+objw = [0.45, 0.55];
+objx = [0,    0.45];
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','text', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String','k in Q(f) = Q(1Hz)f^k', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-h_ex_val = uicontrol('FontSize',fontsizeis, ...
+h_ex_val = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String','0.25', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
 row = row+1;
-uicontrol('FontSize',fontsizeis, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','text', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String','Vel. measured at (Hz)', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-h_fref_val = uicontrol('FontSize',fontsizeis, ...
+h_fref_val = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String',init_value__fref, ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
 
 row = row+1; 
-objw = [0.45, 0.1, 0.1,  0.1,0.1];
-objx = 0.01 + [0, objw(1), sum(objw(1:2)), sum(objw(1:3)) , sum(objw(1:4))];
-h_scale_txt = uicontrol('FontSize',fontsizeis, ...
+objw = [0.45, 0.1375, 0.1375,  0.1375, 0.1375];
+objx = [0.00, objw(1), sum(objw(1:2)), sum(objw(1:3)) , sum(objw(1:4))];
+h_scale_txt = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','text', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String','Freq. range', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-h_scale_min = uicontrol('FontSize',fontsizeis, ...
+h_scale_min = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String',init_value__min_scale, ...
-    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
-h_scale_max= uicontrol('FontSize',fontsizeis, ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);%, ...
+%     'Callback',{@CB_Set_FMIN_percent});
+h_scale_max= uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String',init_value__max_scale, ...
-    'Units','normalized','Position',[objx(3), objy(row), objw(3), objh]);
+    'Units','normalized','Position',[objx(3), objy(row), objw(3), objh]);%, ...
+%    'Callback',{@CB_Set_FMAX_percent});
 
-uicontrol('FontSize',fontsizeis, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','text', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String','dd', ...
     'Units','normalized','Position',[objx(4), objy(row), objw(4), objh]);
-h_dscale= uicontrol('FontSize',fontsizeis, ...
+h_dscale= uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
-    'parent',hT2_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String',init_value__dscale, ...
     'Units','normalized','Position',[objx(5), objy(row), objw(5), objh]);
 %%          Model
 row = row+4; 
-objw = [0.4, 0.3];
-objx = 0.01 + [0, (objw(1) )];
-h_fwd_bw = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT2_P1, ...
+objw = [0.5, 0.5];
+objx = [0, (objw(1) )];
+h_fwd_bw = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','MODEL (P/S)', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_start_model});
 %
-h_fwd_sw=uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT2_P1, ...
+h_fwd_sw=uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'enable', FLAG__PC_features, ...
     'String','MODEL (SW)', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
     'Callback',{@B_start_model_sw});
 %%          Inversion 
 row = row+1;
-objw = [0.4, 0.3 0.25];
-objx = 0.01 + [0, (objw(1)),  (sum(objw(1:2)))];
-T2_P1_inv_button_bw = uicontrol('FontSize',fontsizeis,'Style','togglebutton','parent',hT2_P1, ...
+objw = [0.5, 0.3 0.2];
+objx = [0, (objw(1)),  (sum(objw(1:2)))];
+T2_P1_inv_button_bw = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','togglebutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','START Inversion (P/S)', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_start_inversion});
-T2_P1_global_it_count = uicontrol('FontSize',fontsizeis,'Style','text','parent',hT2_P1, ...
+T2_P1_global_it_count = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A, ...
     'String','0 So far.', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
-T2_P1_max_it = uicontrol('FontSize',fontsizeis,'Style','edit','parent',hT2_P1, ...
+T2_P1_max_it = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','edit','parent',H.PANELS{P.tab_id}.A, ...
     'String','50000', ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh], ...
     'BackgroundColor', [1 1 1]);
 %
 row = row+1;
-T2_P1_inv_button_sw = uicontrol('FontSize',fontsizeis,'Style','togglebutton','parent',hT2_P1, ...
+T2_P1_inv_button_sw = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','togglebutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','START Inversion (SW)', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Enable',FLAG__PC_features, ...
     'Callback',{@B_start_inversion_SW});
-T2_P1_progress = uicontrol('FontSize',fontsizeis,'Style','text','parent',hT2_P1, ...
+T2_P1_progress = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A, ...
     'String','', ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh]);
 
 row = row+1;
-T2_P1_inv_button_lw = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT2_P1, ...
+T2_P1_inv_button_lw = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Automatic Weighting', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_auto_lateral_weights});
@@ -664,8 +865,8 @@ if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
     set(T2_P1_max_it,'TooltipString',hoveoverstring)
 end
 %%    Panel-B  Curve-Weighting Function
-pos_panel = [0.325 0.50,  (1-0.325) 0.50];
-hT2_P2 = uipanel('title','Frequence-Weighting Function','parent',hTab_Inversion,'Units','normalized','Position',pos_panel); 
+%190404 pos_panel = [0.325 0.50,  (1-0.325) 0.50];
+%190404 hT2_P2 = uipanel('title','Frequence-Weighting Function','parent',hTab_Inversion,'Units','normalized','Position',pos_panel); 
 hAx_cwf_hcmenu = uicontextmenu;
 uimenu(hAx_cwf_hcmenu, 'Label', 'Modify',  'Callback', @CM_hAx_cwf_modify);
 uimenu(hAx_cwf_hcmenu, 'Label', 'Exp. Decay',  'Callback', @CM_set_logaritmic_decreasing);
@@ -673,148 +874,157 @@ uimenu(hAx_cwf_hcmenu, 'Label', 'Reset',   'Callback', @CM_hAx_cwf_reset_to_1);
 uimenu(hAx_cwf_hcmenu, 'Label', 'Show linear',    'Callback', @CM_hAx_cwf_show_lin, 'Separator','on');
 uimenu(hAx_cwf_hcmenu, 'Label', 'Show logaritmic','Callback', @CM_hAx_cwf_show_log);
 uimenu(hAx_cwf_hcmenu, 'Label', 'Edit externally',    'Callback', {@plot_extern,1}, 'Separator','on');
-hAx_cwf= axes('Parent',hT2_P2,'Units', 'normalized','Units','normalized','FontSize',fontsizeis,'Position', [0.1 0.15 0.8 0.7],'uicontextmenu',hAx_cwf_hcmenu);
+Position_Axes = [0.1 (0.45+0.15) 0.8 0.3];
+hAx_cwf= axes('Parent',H.PANELS{P.tab_id}.B,'Units', 'normalized','Units','normalized', ...
+    'FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
+    'Position', Position_Axes, ...
+    'uicontextmenu',hAx_cwf_hcmenu, ...
+    'title','Curve Weights');
+%
 %%    Panel-C  Depth-Weighting Function
-pos_panel = [0.325 0.00,  (1-0.325) 0.50];
-hT2_P3 = uipanel('title','Depth-Weighting Function','parent',hTab_Inversion,'Units','normalized','Position',pos_panel); 
+%190404 pos_panel = [0.325 0.00,  (1-0.325) 0.50];
+%190404 hT2_P3 = uipanel('title','Depth-Weighting Function','parent',hTab_Inversion,'Units','normalized','Position',pos_panel); 
 hAx_dwf_hcmenu = uicontextmenu;
 uimenu(hAx_dwf_hcmenu, 'Label', 'Modify',  'Callback', @CM_hAx_dwf_modify);
 uimenu(hAx_dwf_hcmenu, 'Label', 'Reset',   'Callback', @CM_hAx_dwf_reset_to_1);
 uimenu(hAx_dwf_hcmenu, 'Label', 'Show linear',    'Callback', @CM_hAx_dwf_show_lin);
 uimenu(hAx_dwf_hcmenu, 'Label', 'Show logaritmic','Callback', @CM_hAx_dwf_show_log);
-hAx_dwf= axes('Parent',hT2_P3,'Units','normalized','FontSize',fontsizeis,'Position', [0.1 0.15 0.8 0.7],'uicontextmenu',hAx_dwf_hcmenu);
-%% TAB: ========================================================== Model 1D
+Position_Axes = [0.1 0.15 0.8 0.3];
+hAx_dwf= axes('Parent',H.PANELS{P.tab_id}.B,'Units','normalized', ...
+    'FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
+    'Position', Position_Axes, ...
+    'uicontextmenu',hAx_dwf_hcmenu, ...
+    'title','Depth Weights');
+%% TAB-2: ======================================================== Model 1D
 %
 %   [BB][CCC][DDD]
 %   [BB][CCC][DDD]
-%   [AA][CCC][DDD]
-%   [AA][CCC][DDD]
+%   [AA][CCC][EEE]
+%   [AA][CCC][EEE]
 %
-%%    Panel-A: Controls
-pos_panel = [0 0.0 0.325, 0.5];%0.4, 0.5];
-dw = 0.01;
-dh = 0.00;
-objh = 2 * (  0.9*(1-dh)/Nrowa  );% object sizes (pos_panel(4) is becase ) 
-objy = 2 * (  dh + ( (Nrowa-1):-1:0 )*(1/Nrowa)  );
-
-hT3_P1 = uipanel('parent',hTab_1d_viewer,'Position',pos_panel); 
+create_new_tab('Local Inversion');
+%%     Panels
+H.PANELS{P.tab_id}.A = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units', 'normalized','Position',Pnl.Lay3.A);
+if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.A,'title','A');end
+H.PANELS{P.tab_id}.B = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units','normalized','Position',Pnl.Lay3.B);
+if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.B,'title','B');end
+H.PANELS{P.tab_id}.C = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units','normalized','Position',Pnl.Lay3.C);
+if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.C,'title','C');end
+H.PANELS{P.tab_id}.D = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units','normalized','Position',Pnl.Lay3.D);
+if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.D,'title','D');end
+H.PANELS{P.tab_id}.E = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units','normalized','Position',Pnl.Lay3.E);
+if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.E,'title','E');end
+%%     Objets on panel A
+objh = get_normalheight_on_panel( H.PANELS{P.tab_id}.A, G.main_objh );
+objy = get_normalheight_on_panel( H.PANELS{P.tab_id}.A, G.main_object_levels );
 %%       Objects 
-
 row = 18;
 objw = [0.2, 0.2,   0.195, 0.195, 0.195];
-gapx = 1-sum(objw)-0.005;%1-sum(objw)-2*dw;
+gapx = 1-sum(objw)-0.005;
 objx = [0, objw(1), (sum(objw(1:2)) + gapx), (sum(objw(1:3)) + gapx) , (sum(objw(1:4)) + gapx)];
-h_1d_prev = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+h_1d_prev = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','<<', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
-    'Callback',{@CM_hAx_geo_back});
-h_1d_next = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+    'Callback',{@CB_hAx_geo_back});
+h_1d_next = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','>>', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
-    'Callback',{@CM_hAx_geo_next});
+    'Callback',{@CB_hAx_geo_next});
 
-h_1d_spreadL = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+h_1d_spreadL = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Spread L', ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh], ...
     'Callback',{@CM_hAx_keep_and_spread_left});
-h_1d_spreadALL = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+h_1d_spreadALL = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Spread', ...
     'Units','normalized','Position',[objx(4), objy(row), objw(4), objh], ...
     'Callback',{@CM_hAx_keep_and_spread_model});
-h_1d_spreadR = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+
+h_1d_spreadR = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Spread R', ...
     'Units','normalized','Position',[objx(5), objy(row), objw(5), objh], ...
     'Callback',{@CM_hAx_keep_and_spread_right});
 
 row = row+1;
-h_1d_disable = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+h_1d_disable =uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Disable', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@CM_hAx_geo_disable});
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Enable', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
     'Callback',{@CM_hAx_geo_enable});
 %% NEW BUTTON, look side effects: CM_hAx_keep_and_spread_to  
-h_1d_spreadTO = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+h_1d_spreadTO = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Spread to:', ...
     'Enable','on', ... 
     'Units','normalized','Position',[objx(4), objy(row), objw(4), objh], ...
     'Callback',{@CM_hAx_keep_and_spread_to});
 
 row = row+1;
-h_1d_Lock = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+h_1d_Lock = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Lock Model', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_lock_model});
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Unlock Model', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
     'Callback',{@B_unlock_model});
 %% NEW BUTTON, look side effects: CM_hAx_double_all_layers
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Double layers', ...
-    'Enable',beta_stuff_enable_status, ...
+    'Enable',P.ExtraFeatures.beta_stuff_enable_status, ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh], ...
     'Callback',{@CM_hAx_double_all_layers});
 %% NEW BUTTON, look side effects: CM_hAx_double_a_layer
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Double layer', ...
-    'Enable',beta_stuff_enable_status, ...
+    'Enable',P.ExtraFeatures.beta_stuff_enable_status, ...
     'Units','normalized','Position',[objx(4), objy(row), objw(4), objh], ...
     'Callback',{@CM_hAx_double_a_layer});
-
-% row = row+1;
-% uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
-%     'String','Insert Break', ...
-%     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
-%     'Callback',{@BT_insert_break});
-% uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
-%     'String','Delete Breaks', ...
-%     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
-%     'Callback',{@BT_delete_breaks});
+%
 %% NEW BUTTON, look side effects: CM_hAx_keep_unite_all_layers
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Unite layers', ...
-    'Enable',beta_stuff_enable_status, ...
+    'Enable',P.ExtraFeatures.beta_stuff_enable_status, ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh], ...
     'Callback',{@CM_hAx_keep_unite_all_layers});
 %% NEW BUTTON, look side effects: CM_hAx_keep_and_unite_two_layers
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Unite two layers', ...
-    'Enable',beta_stuff_enable_status, ...
+    'Enable',P.ExtraFeatures.beta_stuff_enable_status, ...
     'Units','normalized','Position',[objx(4), objy(row), objw(4), objh], ...
     'Callback',{@CM_hAx_keep_and_unite_two_layers});
 %% NEW BUTTON, look side effects: CM_hAx_keep_Equate_layer_number
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Equate N of layers', ...
-    'Enable',beta_stuff_enable_status, ...
+    'Enable',P.ExtraFeatures.beta_stuff_enable_status, ...
     'Units','normalized','Position',[objx(4), objy(row), objw(4), objh], ...
     'Callback',{@CM_hAx_keep_Equate_layer_number});
 %%
 row = row+2;
 objw = [0.3, 0.3 0.3];
 objx = [0, objw(1), sum(objw(1:2))];% 0.01 + [0, objw(1), sum(objw(1:2))];
-T3_P1_inv = uicontrol('FontSize',fontsizeis,'Style','togglebutton','parent',hT3_P1, ...
+T3_P1_inv = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','togglebutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Optimize (P/S)', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_start_inversion__independently});
-T3_P1_it_count = uicontrol('FontSize',fontsizeis,'Style','text','parent',hT3_P1, ...
+T3_P1_it_count = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A, ...
     'String','0', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
-T3_P1_max_it = uicontrol('FontSize',fontsizeis,'Style','edit','parent',hT3_P1, ...
+T3_P1_max_it = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','edit','parent',H.PANELS{P.tab_id}.A, ...
     'String','10000', ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh], ...
     'BackgroundColor', [1 1 1]);
 row = row+1;
-T3_P1_invSW = uicontrol('FontSize',fontsizeis,'Style','togglebutton','parent',hT3_P1, ...
+T3_P1_invSW = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','togglebutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Optimize (SW)', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Enable',FLAG__PC_features, ...
     'Callback',{@B_start_inversion__independently_SW});
 row = row+1;
-T3_p1_revert = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P1, ...
+T3_p1_revert = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Revert', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_revert_1d});
@@ -822,38 +1032,40 @@ T3_p1_revert = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3
 row = row+1;
 objw = [0.1, 0.3];
 objx = 0.01 + [0, objw(1)];
-h_realtime = uicontrol('FontSize',fontsizeis, ...
+h_realtime = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','radiobutton', ...
-    'parent',hT3_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'Value', 0, ... 
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-uicontrol('FontSize',fontsizeis, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','text', ...
-    'parent',hT3_P1, ...
+    'parent',H.PANELS{P.tab_id}.A, ...
     'String','Toggle real-time updates', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
 
 row = row+2;
-objw = 1-2*dw;
+objw = 1;
 objx = 0.01;
-T3_P1_txt = uicontrol('FontSize',fontsizeis,'Style','text', ... 
-    'parent',hT3_P1,'Units','normalized','Position',[objx, objy(row), objw, objh], ...
+T3_P1_txt = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text', ... 
+    'parent',H.PANELS{P.tab_id}.A,'Units','normalized','Position',[objx, objy(row), objw, objh], ...
     'BackgroundColor', [1 1 1]);
 %%    Panel-B: Surveys locations 
-pos_panel = [0 0.5 0.325, 0.5];%0.4, 0.5];
+%190404 pos_panel = [0 0.5 0.325, 0.5];%0.4, 0.5];
 pos_axes  = [0.1 0.1 0.8 0.8];
-hT3_P4 = uipanel('FontSize',fontsizeis,'parent',hTab_1d_viewer,'Units','normalized','Position',pos_panel);
+%190404 hT3_P4 = uipanel('FontSize',fontsizeis,'parent',hTab_1d_viewer,'Units','normalized','Position',pos_panel);
 hAx_geo_hcmenu = uicontextmenu;
-uimenu(hAx_geo_hcmenu, 'Label', 'Show',   'Callback', @CM_hAx_geo_show);
-uimenu(hAx_geo_hcmenu, 'Label', 'Define 2D profile',    'Callback', {@define_Profile,3}, 'Separator','on');
-%uimenu(hAx_geo_hcmenu, 'Label', 'Disable','Callback', @CM_hAx_geo_disable);
-%uimenu(hAx_geo_hcmenu, 'Label', 'Enable', 'Callback', @CM_hAx_geo_enable);
+%190404  uimenu(hAx_geo_hcmenu, 'Label', 'Show',   'Callback', @CM_hAx_geo_show);
+%190404  uimenu(hAx_geo_hcmenu, 'Label', 'Define 2D profile',    'Callback', {@define_Profile}, 'Separator','on');
+%190404  uimenu(hAx_geo_hcmenu, 'Label', 'Discard  a profile',    'Callback', {@reset_one_Profile});
+%190404  uimenu(hAx_geo_hcmenu, 'Label', 'Discard  ALL profiles',    'Callback', {@reset_Profile});
+%190404 uimenu(hAx_geo_hcmenu, 'Label', 'Disable','Callback', @CM_hAx_geo_disable);
+%190404 uimenu(hAx_geo_hcmenu, 'Label', 'Enable', 'Callback', @CM_hAx_geo_enable);
 uimenu(hAx_geo_hcmenu, 'Label', 'Edit externally',    'Callback', {@plot_extern,3}, 'Separator','on');
 
-hAx_geo= axes('Parent',hT3_P4,'Units', 'normalized','FontSize',fontsizeis,'Position',pos_axes,'uicontextmenu',hAx_geo_hcmenu);
+hAx_geo= axes('Parent',H.PANELS{P.tab_id}.B,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',pos_axes,'uicontextmenu',hAx_geo_hcmenu);
 %%    Panel-C: data view
 pos_panel = [0.325 0    0.325, 1];%[0.4 0    0.3, 1];
-hT3_P2 = uipanel('FontSize',fontsizeis,'parent',hTab_1d_viewer,'Position',pos_panel); 
+%190404 hT3_P2 = uipanel('FontSize',fontsizeis,'parent',hTab_1d_viewer,'Position',pos_panel); 
 hAx_dat_hcmenu = uicontextmenu;
 uimenu(hAx_dat_hcmenu, 'Label', 'Discard data',   'Callback', @CM_hAx_dat_disable);
 uimenu(hAx_dat_hcmenu, 'Label', 'Restore data',   'Callback', @CM_hAx_dat_enable, 'Separator','on');
@@ -861,75 +1073,70 @@ uimenu(hAx_dat_hcmenu, 'Label', 'Show linear',    'Callback', @CM_hAx_dat_show_l
 uimenu(hAx_dat_hcmenu, 'Label', 'Show logaritmic','Callback', @CM_hAx_dat_show_log);
 uimenu(hAx_dat_hcmenu, 'Label', 'Edit externally','Callback', {@plot_extern,4}, 'Separator','on');
 pos_axes = [0.1 0.1 0.8 0.8];
-hAx_dat= axes('Parent',hT3_P2,'Units', 'normalized','FontSize',fontsizeis,'Position',pos_axes,'uicontextmenu',hAx_dat_hcmenu);
+hAx_dat= axes('Parent',H.PANELS{P.tab_id}.C,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',pos_axes,'uicontextmenu',hAx_dat_hcmenu);
 %%    Panel-D: model view
-pos_panel = [0.65 0    0.35, 1  ];%0.3, 1  ];
-pos_table = [0   0.5  1    0.5];
-hT3_P3 = uipanel('FontSize',fontsizeis,'parent',hTab_1d_viewer,'Units','normalized','Position',pos_panel); 
-%hAx_mod_hcmenu = uicontextmenu;
-%uimenu(hAx_mod_hcmenu, 'Label', 'Modify',   'Callback', @CM_hAx_mod_modify);
-%hAx_mod= axes('Parent',hT3_P3,'Units', 'normalized','Units','normalized','Position', [0.12 0.12 0.75 0.75],'uicontextmenu',hAx_mod_hcmenu);
+objh = get_normalheight_on_panel( H.PANELS{P.tab_id}.A, G.main_objh );
+objy = get_normalheight_on_panel( H.PANELS{P.tab_id}.A, G.main_object_levels );
+pos_table = [0   0  1  1];
+%
 hTab_mod_cnames = {'Vp','Vs','Rho','H','Qp','Qs','Depth'};
 hTab_mod_hcmenu = uicontextmenu;
 uimenu(hTab_mod_hcmenu, 'Label', 'Modify',   'Callback', @CM_hAx_mod_modify);
-hTab_mod= uitable('Parent',hT3_P3,'ColumnName',hTab_mod_cnames,'Units','normalized','Units','normalized','Position',pos_table, ...
+hTab_mod= uitable('Parent',H.PANELS{P.tab_id}.D,'ColumnName',hTab_mod_cnames,'Units','normalized','Units','normalized','Position',pos_table, ...
     'uicontextmenu',hTab_mod_hcmenu, ...
-    'FontSize',fontsizeis,'ColumnFormat',{'bank','bank','bank','bank','bank','bank','bank'}, ...
+    'FontSize',USER_PREFERENCE_interface_objects_fontsize,'ColumnFormat',{'bank','bank','bank','bank','bank','bank','bank'}, ...
     'ColumnWidth',{75 75 50 50 50 50}); 
 %
-row = 18;
-objw = 0.10;
-%objh = 0.05;
-objh = 0.9*(1-dh)/Nrowa; % object sizes
-%objy = dh + ( (Nrowa-1):-1:0 )*(1/Nrowa);
-objy = 0.5-objh;
-objx = (0.5-(4*objw+3*dw)) + [0, (objw+dw), (2*objw+2*dw), (3*objw+3*dw), (4*objw+4*dw), (5*objw+5*dw), (6*objw+6*dw), (7*objw+7*dw)];
-
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P3, ...
+row = 1;
+dww = 1/7;
+objw = dww*[1 1 1 1 1 1 1];
+objx = 0:dww:(1-dww);
+%
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.D, ...
     'String','Vp', ...
-    'Units','normalized','Position',[objx(1), objy, objw(1), objh], ...
+    'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_hAx_model_profile, 1});
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P3, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.D, ...
     'String','Vs', ...
-    'Units','normalized','Position',[objx(2), objy, objw(1), objh], ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(1), objh], ...
     'Callback',{@B_hAx_model_profile, 2});
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P3, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.D, ...
     'String','Ro', ...
-    'Units','normalized','Position',[objx(3), objy, objw(1), objh], ...
+    'Units','normalized','Position',[objx(3), objy(row), objw(1), objh], ...
     'Callback',{@B_hAx_model_profile, 3});
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P3, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.D, ...
     'String','Qp', ...
-    'Units','normalized','Position',[objx(4), objy, objw(1), objh], ...
+    'Units','normalized','Position',[objx(4), objy(row), objw(1), objh], ...
     'Callback',{@B_hAx_model_profile, 4});
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P3, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.D, ...
     'String','Qs', ...
-    'Units','normalized','Position',[objx(5), objy, objw(1), objh], ...
+    'Units','normalized','Position',[objx(5), objy(row), objw(1), objh], ...
     'Callback',{@B_hAx_model_profile, 5});
 %
 %row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P3, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.D, ...
     'String','Nu', ...
-    'Units','normalized','Position',[objx(6), objy, objw(1), objh], ...
+    'Units','normalized','Position',[objx(6), objy(row), objw(1), objh], ...
     'Callback',{@B_hAx_model_profile, 6});
 %row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT3_P3, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.D, ...
     'String','DW', ...
-    'Units','normalized','Position',[objx(7), objy, objw(1), objh], ...
+    'Units','normalized','Position',[objx(7), objy(row), objw(1), objh], ...
     'Callback',{@B_hAx_model_profile, 7});
-%
-pos_axes = [0.1 0.075  0.38 0.39];
+%%    Panel-D: model view
+pos_axes = [0.1 0.075  0.38 1];
 hAx_1dprof_hcmenu = uicontextmenu;
 uimenu(hAx_1dprof_hcmenu, 'Label', 'Edit externally','Callback', {@plot_extern,5});
-hAx_1dprof= axes('Parent',hT3_P3,'Units', 'normalized','FontSize',fontsizeis,'Position',pos_axes,'uicontextmenu',hAx_1dprof_hcmenu);
+hAx_1dprof= axes('Parent',H.PANELS{P.tab_id}.E,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',pos_axes,'uicontextmenu',hAx_1dprof_hcmenu);
 %
-pos_axes2 = [0.6 0.075  0.38 0.39];
+pos_axes2 = [0.6 0.075  0.38 1];
 hAx_MvsIT_hcmenu = uicontextmenu;
 uimenu(hAx_MvsIT_hcmenu, 'Label', 'Edit externally','Callback', {@plot_extern,5});
-hAx_MvsIT = axes('Parent',hT3_P3,'Units', 'normalized','FontSize',fontsizeis,'Position',pos_axes2);%,'uicontextmenu',hAx_MvsIT_hcmenu);
+hAx_MvsIT = axes('Parent',H.PANELS{P.tab_id}.E,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',pos_axes2);%,'uicontextmenu',hAx_MvsIT_hcmenu);
 %
 %%    mouse over tips
 if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
@@ -976,159 +1183,198 @@ if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
     hoveoverstring = sprintf('Number of iterations still to perform');
     set(T3_P1_max_it,'TooltipString',hoveoverstring)
 end
-%% TAB: ======================================================== Section 2D
-%%    Panel-A: Controls
-pos_panel = [0 0,  0.1 1];
-hT4_P1 = uipanel('FontSize',fontsizeis,'parent',hTab_2d_viewer,'Position',pos_panel);
+%% TAB-3: ====================================================== Section 3D
+%
+%   [AA][BBBBBB]
+%   [AA][BBBBBB]
+%   [AA][BBBBBB]
+%   [AA][BBBBBB]
+%
+create_new_tab('Model Viewer');
+%%set(H.TABS(P.tab_id),'ButtonDownFcn',{@CB_TAB_main_view_update})
+%%     Panels
+H.PANELS{P.tab_id}.A = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units', 'normalized','Position',Pnl.Lay0.A);
+if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.A,'title','A');end
+H.PANELS{P.tab_id}.B = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units','normalized','Position',Pnl.Lay0.B);
+if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.B,'title','B');end
+%%     Objets on panel A
+objh = get_normalheight_on_panel( H.PANELS{P.tab_id}.A, G.main_objh );
+objy = get_normalheight_on_panel( H.PANELS{P.tab_id}.A, G.main_object_levels );
 %%        Objects
-objh = 0.9*(1-dh)/Nrowa;% object sizes
-objy = dh + ( (Nrowa-1):-1:0 )*(1/Nrowa);
-objw = 1-2*dw;
-objx = dw;
-row = 1;
-hwi23D = uicontrol('FontSize',fontsizeis,'Style','listbox','parent',hT4_P1, ...
+objw = 1;
+objx = 0;
+row  = 3;
+hwi23D = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','listbox','parent',H.PANELS{P.tab_id}.A, ...
     'String',[ '  3D ';'Prof.'], ...
-    'Units','normalized','Position',[objx, objy(row), objw, objh]);
-row = row+1;
-
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
+    'Units','normalized','Position',[objx, objy(row), objw, 3*objh]);
+%
+row = row+2;
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Refresh', ...
     'Units','normalized','Position',[objx, objy(row), objw, objh], ...
     'Callback',{@BT_refresh_modelview});
 row = row+2;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Vp', ...
     'Units','normalized','Position',[objx, objy(row), objw, objh], ...
     'Callback',{@BT_show_media,1});
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Vs', ...
     'Units','normalized','Position',[objx, objy(row), objw, objh], ...
     'Callback',{@BT_show_media,2});
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Ro', ...
     'Units','normalized','Position',[objx, objy(row), objw, objh], ...
     'Callback',{@BT_show_media,3});
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Qp', ...
     'Units','normalized','Position',[objx, objy(row), objw, objh], ...
     'Callback',{@BT_show_media,4});
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Qs', ...
     'Units','normalized','Position',[objx, objy(row), objw, objh], ...
     'Callback',{@BT_show_media,5});
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','', ...
     'Units','normalized','Position',[objx, objy(row), objw, objh]);
-% uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
+% uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
 %     'String','Profiling', ...
 %     'Units','normalized','Position',[objx, objy(row), objw, objh], ...
 %     'Callback',{@BT_show_media,6});
 %%        Slicers
 row = row+3;
-Slider0 = uicontrol('Style','slider','parent',hT4_P1,'Units','normalized', ...
+Slider0 = uicontrol('Style','slider','parent',H.PANELS{P.tab_id}.A,'Units','normalized', ...
+    'FontSize',USER_PREFERENCE_interface_objects_fontsize, ... 
     'Max',1,'Min',0,'Value',0, ...
     'TooltipString','slicer (X-) side', ...
     'Position',[objx, objy(row), objw, objh],'Callback',{@Slider0_Callback});
 row = row+1;
-Slider0b = uicontrol('Style','slider','parent',hT4_P1,'Units','normalized', ...
+Slider0b = uicontrol('Style','slider','parent',H.PANELS{P.tab_id}.A,'Units','normalized', ...
+    'FontSize',USER_PREFERENCE_interface_objects_fontsize, ... 
     'Max',1,'Min',0,'Value',1, ...
     'TooltipString','slicer (X+) side', ...
     'Position',[objx, objy(row), objw, objh],'Callback',{@Slider0b_Callback});
 row = row+2;
-Slider1 = uicontrol('Style','slider','parent',hT4_P1,'Units','normalized', ...
+Slider1 = uicontrol('Style','slider','parent',H.PANELS{P.tab_id}.A,'Units','normalized', ...
+    'FontSize',USER_PREFERENCE_interface_objects_fontsize, ... 
     'Max',1,'Min',0,'Value',0, ...
     'TooltipString','slicer (Y-) side', ...
     'Position',[objx, objy(row), objw, objh],'Callback',{@Slider1_Callback});
 row = row+1;
-Slider1b = uicontrol('Style','slider','parent',hT4_P1,'Units','normalized', ...
+Slider1b = uicontrol('Style','slider','parent',H.PANELS{P.tab_id}.A,'Units','normalized', ...
+    'FontSize',USER_PREFERENCE_interface_objects_fontsize, ... 
     'Max',1,'Min',0,'Value',1, ...
     'TooltipString','slicer (Y+) side', ...
     'Position',[objx, objy(row), objw, objh],'Callback',{@Slider1b_Callback});
 row = row+2;
-Slider2 = uicontrol('Style','slider','parent',hT4_P1,'Units','normalized', ...
+Slider2 = uicontrol('Style','slider','parent',H.PANELS{P.tab_id}.A,'Units','normalized', ...
+    'FontSize',USER_PREFERENCE_interface_objects_fontsize, ... 
     'Max',1,'Min',0,'Value',0, ...
     'TooltipString','slicer (Z-) side', ...
     'Position',[objx, objy(row), objw, objh],'Callback',{@Slider2_Callback});
 row = row+1;
-Slider2b = uicontrol('Style','slider','parent',hT4_P1,'Units','normalized', ...
+Slider2b = uicontrol('Style','slider','parent',H.PANELS{P.tab_id}.A,'Units','normalized', ...
+    'FontSize',USER_PREFERENCE_interface_objects_fontsize, ... 
     'Max',1,'Min',0,'Value',1, ...
     'TooltipString','slicer (Z+) side', ...
     'Position',[objx, objy(row), objw, objh],'Callback',{@Slider2b_Callback});
 row = row+1;
-Btn0 = uicontrol('Style','pushbutton','parent',hT4_P1,'Units','normalized', ...
-    'FontSize',fontsizeis, ...
+Btn0 = uicontrol('Style','pushbutton','parent',H.PANELS{P.tab_id}.A,'Units','normalized', ...
+    'FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'String','Reset', ...
     'Position',[objx, objy(row), objw, objh], 'Enable','on', ...
     'Callback',{@ResetSlices_Callback});
 %%
-row = row+3;
-h_togg_terrain = uicontrol('Style','radiobutton','parent',hT4_P1,'Units','normalized', ...
+row = row+2;
+h_togg_terrain = uicontrol('Style','radiobutton','parent',H.PANELS{P.tab_id}.A,'Units','normalized', ...
+    'FontSize',USER_PREFERENCE_interface_objects_fontsize, ... 
     'Value',1, ...
     'String','Terrain', ...
     'Position',[objx, objy(row), objw, objh],'Callback',{@BT_refresh_modelview});
 row = row+1;
-h_togg_measpoints = uicontrol('Style','radiobutton','parent',hT4_P1,'Units','normalized', ...
+h_togg_measpoints = uicontrol('Style','radiobutton','parent',H.PANELS{P.tab_id}.A,'Units','normalized', ...
+    'FontSize',USER_PREFERENCE_interface_objects_fontsize, ... 
     'Value',1, ...
     'String','Survey', ...
     'Position',[objx, objy(row), objw, objh],'Callback',{@BT_refresh_modelview});
 row = row+1;
-
+h_togg_2D_layers_boundaries = uicontrol('Style','radiobutton','parent',H.PANELS{P.tab_id}.A,'Units','normalized', ...
+    'FontSize',USER_PREFERENCE_interface_objects_fontsize, ... 
+    'Value',0, ...
+    'String','Layers boundaries', ...
+    'Position',[objx, objy(row), objw, objh],'Callback',{@BT_refresh_modelview});
+%row = row+1;
+row = row+1;
+h_togg_2D_bedrock_line = uicontrol('Style','radiobutton','parent',H.PANELS{P.tab_id}.A,'Units','normalized', ...
+    'FontSize',USER_PREFERENCE_interface_objects_fontsize, ... 
+    'Value',0, ...
+    'String','Bedrock line', ...
+    'Position',[objx, objy(row), objw, objh],'Callback',{@BT_refresh_modelview});
+row = row+1;
+T5_P1_HsMask = uicontrol('Style','radiobutton','parent',H.PANELS{P.tab_id}.A,'Units','normalized', ...
+    'FontSize',USER_PREFERENCE_interface_objects_fontsize, ...    
+    'String','Mask half-space', 'Value',1, ...
+    'Units','normalized','Position',[objx, objy(row), objw, objh],'Callback',{@BT_refresh_modelview});
+%
 %%    Panel-B: 2D/3D representation
-pos_panel = [0.1 0,  0.9 1];
+%190404 pos_panel = [0.1 0,  0.9 1];
 pos_axes  = [0.05 0.05 0.90 0.90];
-hT4_P2 = uipanel('FontSize',fontsizeis,'parent',hTab_2d_viewer,'Position',pos_panel);
+%190404 hT4_P2 = uipanel('FontSize',fontsizeis,'parent',hTab_2d_viewer,'Position',pos_panel);
 hAx_2dprof_hcmenu = uicontextmenu;
 uimenu(hAx_2dprof_hcmenu, 'Label', 'Edit externally','Callback', {@plot_extern,6});
-
-hAx_2Dprof = axes('Parent',hT4_P2,'Units', 'normalized','FontSize',fontsizeis,'Position', pos_axes,'uicontextmenu',hAx_2dprof_hcmenu);
+%
+hAx_2Dprof = axes('Parent',H.PANELS{P.tab_id}.B,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position', pos_axes,'uicontextmenu',hAx_2dprof_hcmenu);
 %%
-%% TAB:       ================================================== Confidence
-%%    Panel-A: X-axis Objects  
-pos_panel = [0.00 0.65,  0.325 0.35];
-dw = 0.01;
-dh = 0.00;
-objn = 10;
-objh = (1/0.35) * (  0.9*(1-dh)/Nrowa  ); 
-objy = dh + objh*(   ( (objn-1):-1:0 )  );
-
-hT5_PA = uipanel('FontSize',fontsizeis,'parent',hTab_Confidenc,'Position',pos_panel,'title','X-axis data');
-
+%% TAB-4: ====================================================== Confidence
+%   [AA][BBB][BBB]
+%   [AA][BBB][BBB]
+%   [AA][BBB][BBB]
+%   [AA][BBB][BBB]
+create_new_tab('Confidence');
+%%set(H.TABS(P.tab_id),'ButtonDownFcn',{@CB_TAB_main_view_update})
+%%     Panels
+H.PANELS{P.tab_id}.A = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units', 'normalized','Position',Pnl.Lay0.A);
+if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.A,'title','A');end
+H.PANELS{P.tab_id}.B = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units','normalized','Position',Pnl.Lay0.B);
+if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.B,'title','B');end
+%
+%%     Objets on panel A
+objh = get_normalheight_on_panel( H.PANELS{P.tab_id}.A, G.main_objh );
+objy = get_normalheight_on_panel( H.PANELS{P.tab_id}.A, G.main_object_levels );
+%
 objw = [0.1, 0.1,   0.75];
-gapx = 1-sum(objw)-2*dw;
-objx = 0.01 + [0, objw(1), (sum(objw(1:2)) + gapx)];
-row = 1;
-hT5_PA_back = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT5_PA, ...
+objx = [0.0, 0.1,   0.25];
+row = 5;
+hT5_PA_back = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','<<', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_conf_backX});
-hT5_PA_next = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT5_PA, ...
+hT5_PA_next = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','>>', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
     'Callback',{@B_conf_nextX});
-T5_P1_txtx = uicontrol('FontSize',fontsizeis,'Style','text','parent',hT5_PA, ...
-    'Units','normalized','Position',[objx(3), objy(row), objw(3), objh],'BackgroundColor', [1 1 1]);
-
+T5_P1_txtx = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A,'Units','normalized','Position',[objx(3), objy(row), objw(3), objh],'BackgroundColor', [1 1 1]);
+%
 row = row+1;
-objw = [0.4, 0.4];
-gapx = 0.1;
-objx = dw + [0, (objw(1)+gapx)];
-uicontrol('FontSize',fontsizeis,'Style','text','parent',hT5_PA,'String','Parameter', ...
+objw = [0.5, 0.5];
+objx = [0, objw(1)];
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A,'String','Parameter', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-uicontrol('FontSize',fontsizeis,'Style','text','parent',hT5_PA,'String','Layer', ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A,'String','Layer', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
 %
-n = 5;
-row = row+n;
-hconf_xprop = uicontrol('FontSize',fontsizeis,'Style','listbox','parent',hT5_PA, ...
-    'Units','normalized','Position',[objx(1), objy(row), objw(1), n*objh], ...
+row = row+2;
+hconf_xprop = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','listbox','parent',H.PANELS{P.tab_id}.A, ...
+    'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'string',[' Vp'; ' Vs'; ' Ro'; ' H '; ' Qp'; ' Qs'; 'DAF']);
-hconf_xlay = uicontrol('FontSize',fontsizeis,'Style','listbox','parent',hT5_PA, ...
-    'Units','normalized','Position',[objx(2), objy(row), objw(2), n*objh]);
+hconf_xlay = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','listbox','parent',H.PANELS{P.tab_id}.A, ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
+
 %%      mouse over tips
 if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
     % X-axis
@@ -1145,45 +1391,38 @@ if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
     set(hconf_xlay,'TooltipString',hoveoverstring)
 end
 %%    Panel-B: Y-axis Objects
-pos_panel = [0.00 0.30,  0.325 0.35];
-dw = 0.01;
-dh = 0.00;
-objn = 10;
-objh = (1/0.35) * (  0.9*(1-dh)/Nrowa  ); 
-objy = dh + objh*(   ( (objn-1):-1:0 )  );
-
-hT5_PB = uipanel('FontSize',fontsizeis,'parent',hTab_Confidenc,'Position',pos_panel,'title','Y-axis data');
+objh = get_normalheight_on_panel( H.PANELS{P.tab_id}.B, G.main_objh );
+objy = get_normalheight_on_panel( H.PANELS{P.tab_id}.B, G.main_object_levels );
 objw = [0.1, 0.1,   0.75];
-gapx = 1-sum(objw)-2*dw;
-objx = 0.01 + [0, objw(1), (sum(objw(1:2)) + gapx)];
-row = 1;
-
-hT5_PB_back = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT5_PB, ...
+gapx = 1-sum(objw);
+objx = [0, objw(1), (sum(objw(1:2)) + gapx)];
+row = row+3;
+%
+hT5_PB_back = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','<<', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_conf_backY});
-hT5_PB_next = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT5_PB, ...
+hT5_PB_next = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','>>', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
     'Callback',{@B_conf_nextY});
-T5_P1_txty = uicontrol('FontSize',fontsizeis,'Style','text','parent',hT5_PB,'Units','normalized','Position',[objx(3), objy(row), objw(3), objh],'BackgroundColor', [1 1 1]);
-
+T5_P1_txty = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A,'Units','normalized','Position',[objx(3), objy(row), objw(3), objh],'BackgroundColor', [1 1 1]);
+%
 row = row+1;
-objw = [0.4, 0.4];
-gapx = 0.1;
-objx = dw + [0, (objw(1)+gapx)];
-uicontrol('FontSize',fontsizeis,'Style','text','parent',hT5_PB,'String','Parameter', ...
+objw = [0.5, 0.5];
+objx = [0, objw(1)];
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A,'String','Parameter', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-uicontrol('FontSize',fontsizeis,'Style','text','parent',hT5_PB,'String','Layer', ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A,'String','Layer', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
 %
-n = 5;
-row = row+n;
-hconf_yprop = uicontrol('FontSize',fontsizeis,'Style','listbox','parent',hT5_PB, ...
-    'Units','normalized','Position',[objx(1), objy(row), objw(1), n*objh], ...
+row = row+2;
+hconf_yprop = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','listbox','parent',H.PANELS{P.tab_id}.A, ...
+    'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'string',[' Vp'; ' Vs'; ' Ro'; ' H '; ' Qp'; ' Qs'; 'DAF']);
-hconf_ylay = uicontrol('FontSize',fontsizeis,'Style','listbox','parent',hT5_PB, ...
-    'Units','normalized','Position',[objx(2), objy(row), objw(2), n*objh]);
+hconf_ylay = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','listbox','parent',H.PANELS{P.tab_id}.A, ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
+
 %%      mouse over tips
 if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
     % Y-axis
@@ -1200,27 +1439,22 @@ if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
     set(hconf_ylay,'TooltipString',hoveoverstring)
 end
 %%    Panel-C: more inputs
-pos_panel = [0.00 0.00,  0.325 0.30];
-hT5_PC = uipanel('FontSize',fontsizeis,'parent',hTab_Confidenc,'Position',pos_panel);
-objn = 6;
-objh = (1/0.30) * (  0.9*(1-dh)/Nrowa  ); 
-objy = dh + objh*(   ( (objn-1):-1:0 )  );
-
-objw = [0.3, 0.3];
-objx = dw + [0, (objw(1))];
-row = 1;
-uicontrol('FontSize',fontsizeis,'Style','text','parent',hT5_PC,'String','Smoothing [0-6]', ...
+%
+objw = [0.5, 0.5];
+objx = [0, (objw(1))];
+row = row+3;
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A,'String','Smoothing [0-6]', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-hconf_nsmooth = uicontrol('FontSize',fontsizeis,'Style','edit','parent',hT5_PC,'String','3', ...
+hconf_nsmooth = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','edit','parent',H.PANELS{P.tab_id}.A,'String','3', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','text','parent',hT5_PC,'String','N of color levels', ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A,'String','N of color levels', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-hconf_nlevels = uicontrol('FontSize',fontsizeis,'Style','edit','parent',hT5_PC,'String','30', ...
+hconf_nlevels = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','edit','parent',H.PANELS{P.tab_id}.A,'String','30', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
 %
 row = row+2;
-hconf_upd = uicontrol('FontSize',fontsizeis,'Style','Pushbutton','parent',hT5_PC,'String','Update', ...
+hconf_upd = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','Pushbutton','parent',H.PANELS{P.tab_id}.A,'String','Update', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@confidence_update_misfit});
 %%      mouse over tips
@@ -1233,72 +1467,78 @@ if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
     set(hconf_upd,'TooltipString',hoveoverstring)
 end
 %%    Panel-D: Confidence plot
-pos_panel = [0.325 0.00,  (1-0.325) 1.00];
+%190404 pos_panel = [0.325 0.00,  (1-0.325) 1.00];
 pos_axis  = [0.1 0.1 0.8 0.8];
-hT5_PD = uipanel('FontSize',fontsizeis,'parent',hTab_Confidenc,'Units','normalized','Position',pos_panel);
+%190404 hT5_PD = uipanel('FontSize',fontsizeis,'parent',hTab_Confidenc,'Units','normalized','Position',pos_panel);
 hAx_cnf_hcmenu = uicontextmenu;
 uimenu(hAx_cnf_hcmenu, 'Label', 'Edit externally','Callback', {@plot_extern,7});
-hAx_1d_confidence = axes('Parent',hT5_PD,'Units', 'normalized','Units','normalized','FontSize',fontsizeis,'Position',pos_axis,'uicontextmenu',hAx_cnf_hcmenu);
-%% TAB:       ================================================= Sensitivity
-%%    Panel-A: X-axis Objects  
-pos_panel = [0.00 0.0,  0.325 1];
-dw = 0.01;
-dh = 0.00;
-objn = 30;
-objh = (  0.9*(1-dh)/Nrowa  ); 
-objy = dh + objh*(   ( (objn-1):-1:0 )  );
-hT6_PA = uipanel('FontSize',fontsizeis,'parent',hTab_Sensitivt,'Position',pos_panel,'title','Investigated Parameter');
+hAx_1d_confidence = axes('Parent',H.PANELS{P.tab_id}.B,'Units', 'normalized','Units','normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',pos_axis,'uicontextmenu',hAx_cnf_hcmenu);
+%% TAB-5: ===================================================== Sensitivity
+%   [AA][BBB][BBB]
+%   [AA][BBB][BBB]
+%   [AA][BBB][BBB]
+%   [AA][BBB][BBB]
+create_new_tab('Sensitivity');
+%%set(H.TABS(P.tab_id),'ButtonDownFcn',{@CB_TAB_main_view_update})
+%%     Panels
+H.PANELS{P.tab_id}.A = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units', 'normalized','Position',Pnl.Lay0.A);
+if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.A,'title','A');end
+H.PANELS{P.tab_id}.B = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units','normalized','Position',Pnl.Lay0.B);
+if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.B,'title','B');end
+%%     Objets on panel A
+objh = get_normalheight_on_panel( H.PANELS{P.tab_id}.A, G.main_objh );
+objy = get_normalheight_on_panel( H.PANELS{P.tab_id}.A, G.main_object_levels );
+%
 objw = [0.1, 0.1,   0.75];
-gapx = 1-sum(objw)-2*dw;
-objx = 0.01 + [0, objw(1), (sum(objw(1:2)) + gapx)];
+objx = [0.0, 0.1,   0.25];
 row = 5;
-hT6_PA_back = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT6_PA, ...
+hT6_PA_back = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','<<', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_sns_back});
-hT6_PA_next = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT6_PA, ...
+hT6_PA_next = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','>>', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
     'Callback',{@B_sns_next});
-T6_P1_txtx = uicontrol('FontSize',fontsizeis,'Style','text','parent',hT6_PA,'Units','normalized','Position',[objx(3), objy(row), objw(3), objh],'BackgroundColor', [1 1 1]);
-
+T6_P1_txtx = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A,'Units','normalized','Position',[objx(3), objy(row), objw(3), objh],'BackgroundColor', [1 1 1]);
+%
 row = row+1;
-objw = [0.4, 0.4];
+objw = [0.5, 0.5];
 gapx = 0.1;
-objx = dw + [0, (objw(1)+gapx)];
-uicontrol('FontSize',fontsizeis,'Style','text','parent',hT6_PA,'String','Parameter', ...
+objx = [0, objw(1)];
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A,'String','Parameter', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-uicontrol('FontSize',fontsizeis,'Style','text','parent',hT6_PA,'String','Layer', ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A,'String','Layer', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
 %
 n = 5;
 row = row+n;
-hsns_xprop = uicontrol('FontSize',fontsizeis,'Style','listbox','parent',hT6_PA, ...
+hsns_xprop = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','listbox','parent',H.PANELS{P.tab_id}.A, ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), n*objh], ...
     'string',[' Vp'; ' Vs'; ' Ro'; ' H '; ' Qp'; ' Qs']);
-hsns_xlay = uicontrol('FontSize',fontsizeis,'Style','listbox','parent',hT6_PA, ...
+hsns_xlay = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','listbox','parent',H.PANELS{P.tab_id}.A, ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), n*objh]);
 %
 row = row+3;
-uicontrol('FontSize',fontsizeis,'Style','text','parent',hT6_PA,'String','Variation (%)', ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A,'String','Variation (%)', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-hsns_bound = uicontrol('FontSize',fontsizeis,'Style','edit','parent',hT6_PA,'String','25', ...
+hsns_bound = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','edit','parent',H.PANELS{P.tab_id}.A,'String','25', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','text','parent',hT6_PA,'String','Step (%)', ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A,'String','Step (%)', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-hsns_step = uicontrol('FontSize',fontsizeis,'Style','edit','parent',hT6_PA,'String','5', ...
+hsns_step = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','edit','parent',H.PANELS{P.tab_id}.A,'String','5', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
 
 %
 row = row+3;
-uicontrol('FontSize',fontsizeis,'Style','text','parent',hT6_PA,'String','N of color levels', ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A,'String','N of color levels', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh]);
-hsns_nlevels = uicontrol('FontSize',fontsizeis,'Style','edit','parent',hT6_PA,'String','20', ...
+hsns_nlevels = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','edit','parent',H.PANELS{P.tab_id}.A,'String','20', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
 %
 row = row+2;
-uicontrol('FontSize',fontsizeis,'Style','Pushbutton','parent',hT6_PA,'String','Update', ...
+uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','Pushbutton','parent',H.PANELS{P.tab_id}.A,'String','Update', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@sensitivity_update_misfit});
 %%      mouse over tips
@@ -1336,12 +1576,13 @@ end
 % uimenu(hAx_cnf_hcmenu, 'Label', 'Edit externally','Callback', {@plot_extern,8});
 % hAx_sensitivity = axes('Parent',hT6_PC,'Units', 'normalized','Units','normalized','Position',pos_axis,'uicontextmenu',hAx_cnf_hcmenu);
 %%    Panel-C: Sensitivity plot
-pos_panel = [0.325  0.0  (1-0.325) 1.0];% [0.00 0.65,  0.40 0.35];
+%190404 pos_panel = [0.325  0.0  (1-0.325) 1.0];% [0.00 0.65,  0.40 0.35];
 pos_axis  = [0.1 0.1 0.8 0.8];
-hT6_PC = uipanel('FontSize',fontsizeis,'parent',hTab_Sensitivt,'Units','normalized','Position',pos_panel);
+H.PANELS{P.tab_id}.B = uipanel('FontSize',USER_PREFERENCE_interface_objects_fontsize,'parent',H.PANELS{P.tab_id}.B,'Units','normalized','Position',pos_panel);
 hAx_sns_hcmenu = uicontextmenu;
 uimenu(hAx_sns_hcmenu, 'Label', 'Edit externally','Callback', {@plot_extern,8});
-hAx_sensitivity = axes('Parent',hT6_PC,'Units', 'normalized','Units','normalized','FontSize',fontsizeis,'Position',pos_axis,'uicontextmenu',hAx_sns_hcmenu);
+hAx_sensitivity = axes('Parent',H.PANELS{P.tab_id}.B,'Units', 'normalized','Units','normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',pos_axis,'uicontextmenu',hAx_sns_hcmenu);
+
 
 %% Initializations before gui publication
 %[fFS,FSraw]=FourierSpectrum(magn,delt,dept,rock); %Compute theoretical Fourier spectrum for target earthquake (see Setup)
@@ -1354,11 +1595,11 @@ working_folder = '';
 last_project_name = 'myproject.m';
 last_log_number= 0;
 history
-%
-%
-publish_gui(h_gui,h10,appname,version);
-set(h_gui, 'MenuBar', 'none');
-set(h_gui, 'ToolBar', 'none');
+
+
+publish_gui(H.gui,h10,appname,version);
+
+
 %
 %
 %% ************************* GUI CALLBACKS ********************************
@@ -1368,7 +1609,7 @@ set(h_gui, 'ToolBar', 'none');
         folder_name = uigetdir(working_folder,'Select working Folder for the project');
         if(folder_name)
             [SURVEYS,MODELS,datafile_separator,datafile_columns,nameof_reference_model_file1,nameof_reference_model_file2] = ...
-                openhvsr_project_creator(fontsizeis,folder_name, ...
+                openhvsr_project_creator(USER_PREFERENCE_interface_objects_fontsize,folder_name, ...
                 SURVEYS,MODELS,datafile_separator,datafile_columns);
             newprojectname = strcat(folder_name,'/project.m');
             fid = fopen(newprojectname,'w');
@@ -1447,24 +1688,24 @@ set(h_gui, 'ToolBar', 'none');
             fprintf(fid, 'last_log_number = %d;\n', last_log_number);
             fclose(fid);
             
-			%% logging
-%             today = date;
-%             logfolder = strcat(working_folder,'logs');
-%             if(~exist(logfolder,'dir'))% create log folder
-%                 logfolder_exist = mkdir(logfolder);% 1 yes /0
-%                 if(logfolder_exist==1) 
-%                     fprintf('log folder created.\n'); 
-%                 else
-%                     fprintf('log folder creation failed.\n'); 
-%                 end
-%             else
-%                 fprintf('log folder found.\n'); 
-%             end
-%             logname = strcat(working_folder,'logs/LOG_n',num2str(last_log_number),'_',appname,'_',version,'_',today,'.log');
-%             set(0,'DiaryFile',logname)
-%             diary(logname);
-%             diary on;
-%             fprintf('logging on %s\n',get(0,'DiaryFile'))
+			%% logging (temporarily commented)
+% % %             today = date;
+% % %             logfolder = strcat(working_folder,'logs');
+% % %             if(~exist(logfolder,'dir'))% create log folder
+% % %                 logfolder_exist = mkdir(logfolder);% 1 yes /0
+% % %                 if(logfolder_exist==1); 
+% % %                     fprintf('log folder created.\n'); 
+% % %                 else
+% % %                     fprintf('log folder creation failed.\n'); 
+% % %                 end
+% % %             else
+% % %                 fprintf('log folder found.\n'); 
+% % %             end
+% % %             logname = strcat(working_folder,'logs/LOG_n',num2str(last_log_number),'_',appname,'_',version,'_',today,'.log');
+% % %             set(0,'DiaryFile',logname)
+% % %             diary(logname);
+% % %             diary on;
+% % %             fprintf('logging on %s\n',get(0,'DiaryFile'))
             
             %% loading stuff
             scriptname = strcat(thispath,file);
@@ -1477,12 +1718,47 @@ set(h_gui, 'ToolBar', 'none');
 
             % load data files FDAT (Field DATa)
             FDAT = load_data2(working_folder,SURVEYS, datafile_columns,datafile_separator);
+            if isempty(SURVEYS)% still empty
+                warning('I was not able to load this project (empty SURVEYS). aborting...');
+                fprintf('\n')
+                return;
+            end
+            %% check the project is developed along X axis
+            minx = SURVEYS{1}(1);
+            maxx = SURVEYS{1}(1);
+            miny = SURVEYS{1}(2);
+            maxy = SURVEYS{1}(2);
+            for ss = 1:size(SURVEYS,1)
+                if SURVEYS{ss}(1)<minx; minx=SURVEYS{ss}(1); end
+                if SURVEYS{ss}(1)>maxx; maxx=SURVEYS{ss}(1); end
+                %
+                if SURVEYS{ss}(2)<miny; miny=SURVEYS{ss}(2); end
+                if SURVEYS{ss}(2)>maxy; maxy=SURVEYS{ss}(2); end
+            end
+            if minx==maxx && miny==maxy
+		    fprintf('MESSAGE:  Seems that all measurements are located in the same point. Please check X-Y coordinated.\n')
+		    fprintf('          Any image using interpolation will be disabled.\n')
+		    fprintf('(pause, hit any key)\n')
+		    pause
+		    fprintf('\n')
+		    fprintf('\n')
+		    fprintf('\n')
+		    set(hButtRF,'enable','off')
+		    set(hButtVP,'enable','off')
+		    set(hButtVS,'enable','off')
+		    set(hButtRO,'enable','off')
+		    set(hButtQS,'enable','off')
+		    set(hButtQP,'enable','off')
+		    
+		    FLAG_enable_interpolated_images = 0;
+            end
             INIT_FDATS();
 
             % load subsurface starting models MDL (Field DATa)
-            MDLS  = load_models(working_folder,SURVEYS,MODELS);      
+            MDLS  = load_models(working_folder,SURVEYS,MODELS);
             %% update interface
             INIT_tool_variables();
+            Update_survey_locations(hAx_main_geo);
             Update_survey_locations(hAx_geo)      
 
         end
@@ -1630,6 +1906,8 @@ set(h_gui, 'ToolBar', 'none');
         [file,thispath] =  uiputfile('*.mat','Save elaboration', strcat(working_folder,'Elaboration.mat'));
         %uigetfile('*.mat','Save Elaboration',strcat(working_folder,'/Elaboration.mat'));
         if(file ~= 0)
+            OpenHVSR_elaboration_file_version = 2;% define which archive version is this
+            
             ui_dist  = get(hRand,'Value');
             ui_hh_pc = get(h_hh_val, 'String');
             
@@ -1657,6 +1935,8 @@ set(h_gui, 'ToolBar', 'none');
             datname = strcat(thispath,file);
             %save(datname);
                       save(datname, ...
+  'OpenHVSR_elaboration_file_version', ...      
+  'appname', ... 
   'file', ...
   'thispath', ...
   'ui_dist', ... 
@@ -1704,7 +1984,7 @@ set(h_gui, 'ToolBar', 'none');
   'Misfit_slope_term_w', ... 
   'Misfit_vs_Iter', ...      
   'NresultsToKeep', ...      
-  'Nrowa', ...               
+  ... % CHANGE 190404  ver 4.0.0: NOT SAVED ANYMORE (USELESS): 'Nrowa', ...               
   'QHspec', ...              
   'QPList', ... % (3D)
   'QSList', ... % (3D)
@@ -1760,13 +2040,12 @@ set(h_gui, 'ToolBar', 'none');
   'X1', ...                            
   'X2', ...                            
   'ZZList', ... % (3D)                            
-  ... % ans                          
-  'appname', ...                       
+  ... % ans                           
   'basevalue', ...                     
   'basevaluew', ...                    
   'bedrock', ...                       
   'best_FDAT', ...                     
-  'beta_stuff_enable_status', ...      
+  ... % CHANGE 190404  ver 4.0.0: 'beta_stuff_enable_status' >> 'P.ExtraFeatures.beta_stuff_enable_status'     
   ...    
   'conf_1d_to_show_x', ...             
   'conf_1d_to_show_y', ...             
@@ -1774,19 +2053,19 @@ set(h_gui, 'ToolBar', 'none');
   'curve_plotmode', ...               
   'curve_weights_plotmode', ...       
   'cutplanes', ... % (3D)                         
-  'data_1d_to_show', ...              
+  ... % CHANGE 190404  ver 4.0.0: 'data_1d_to_show' >> 'P.isshown.id', ...              
   'datafile_columns', ...             
   'datafile_separator', ...           
   'default_colormap', ...             
   'depth_weights_plotmode', ...       
-  'dh', ...
+  ... % CHANGE 190404  ver 4.0.0: NOT SAVED ANYMORE (USELESS): 'dh', ...
   'dim', ... % (3D)                               
-  'dw', ...                           
+  ... % CHANGE 190404  ver 4.0.0: NOT SAVED ANYMORE (USELESS): 'dw', ...                           
   'dx', ...                           
   ... % %   'eh52', ...                     
   ... % %   'eh52_childs', ...              
-  'enable_menu', ...                  
-  'fontsizeis', ...                   
+  ... % 180323  'enable_menu', ...                  
+  ... % 180323  'fontsizeis', ...                   
   'gapx', ...                         
   'global_inversion_step', ...      
   ... % %   h0                                                         
@@ -1816,27 +2095,27 @@ set(h_gui, 'ToolBar', 'none');
   ... % %   hAx_sensitivity                                            
   ... % %   hAx_sns_hcmenu                                             
   ... % %   hRand                                                      
-  ... % %   hT2_P1                                                     
-  ... % %   hT2_P2                                                     
-  ... % %   hT2_P3                                                     
-  ... % %   hT3_P1                                                     
-  ... % %   hT3_P2                                                     
-  ... % %   hT3_P3                                                     
-  ... % %   hT3_P4                                                     
-  ... % %   hT4_P1                                                     
-  ... % %   hT4_P2                                                     
-  ... % %   hT5_PA                                                     
-  ... % %   hT5_PB                                                     
-  ... % %   hT5_PC                                                     
-  ... % %   hT5_PD                                                     
-  ... % %   hT6_PA                                                     
-  ... % %   hT6_PC                                                     
+  ... % %   H.PANELS{P.tab_id}.A                                                     
+  ... % %   H.PANELS{P.tab_id}.B                                                     
+  ... % %   H.PANELS{P.tab_id}.B                                                     
+  ... % %   H.PANELS{P.tab_id}.A                                                     
+  ... % %   H.PANELS{P.tab_id}.A                                                     
+  ... % %   H.PANELS{P.tab_id}.D                                                     
+  ... % %   H.PANELS{P.tab_id}.B                                                     
+  ... % %   H.PANELS{P.tab_id}.A                                                     
+  ... % %   H.PANELS{P.tab_id}.B                                                     
+  ... % %   H.PANELS{P.tab_id}.A                                                     
+  ... % %   H.PANELS{P.tab_id}.B                                                     
+  ... % %   H.PANELS{P.tab_id}.A                                                     
+  ... % %   H.PANELS{P.tab_id}.B                                                     
+  ... % %   H.PANELS{P.tab_id}.A                                                     
+  ... % %   H.PANELS{P.tab_id}.B                                                     
   ... % %   hTabGroup                                                  
   ... % %   hTab_1d_viewer                                             
   ... % %   hTab_2d_viewer                                             
   ... % %   hTab_Confidenc                                             
   ... % %   hTab_Inversion                                             
-  ... % %   hTab_Sensitivt                                             
+  ... % %   H.PANELS{P.tab_id}.B                                             
   ... % %   hTab_mod                                                   
   ... % %   hTab_mod_cnames                                    
   ... % %   hTab_mod_hcmenu                                            
@@ -1846,7 +2125,7 @@ set(h_gui, 'ToolBar', 'none');
   ... % %   h_ex_val                                                   
   ... % %   h_fref_val                                                 
   ... % %   h_fwd_sw                                                   
-  ... % %   h_gui                                                      
+  ... % %   H.gui                                                      
   ... % %   h_hh_val                                                   
   ... % %   h_qp_val                                                   
   ... % %   h_qp_w                                                     
@@ -1890,11 +2169,11 @@ set(h_gui, 'ToolBar', 'none');
   'last_single_FDAT', ...                       
   'last_single_MDL', ...                        
   'lsmooth', ...                                                    
-  'main_b', ...                                                     
-  'main_h', ...                                                    
-  'main_l', ...                                                     
+  ... % NOT NEDEED 4.0.0:  'main_b', ...                                                     
+  ... % NOT NEDEED 4.0.0:  'main_h', ...                                                    
+  ... % NOT NEDEED 4.0.0:  'main_l', ...                                                     
   'main_scale', ...                             
-  'main_w', ...                                                     
+  ... % NOT NEDEED 4.0.0:  'main_w', ...                                                     
   'max_H', ...                                                      
   'max_lat_dH', ...                                                 
   'max_lat_dQp', ...                                                
@@ -1924,35 +2203,35 @@ set(h_gui, 'ToolBar', 'none');
   'nx_ticks', ...
   'ny_ticks', ...                                %(3D)                                                           
   'nz_ticks', ...                                                   
-  'objh', ...                                                       
-  'objn', ...                                                       
-  'objw', ...                                                       
-  'objx', ...                                                       
-  'objy', ...                              
-  'pos_axes', ...                                                   
-  'pos_axes2', ...                                                  
-  'pos_axis', ...                                                   
-  'pos_panel', ...                                                  
-  'pos_table', ...                                                  
+  ... % CHANGE 190404  ver 4.0.0: NOT SAVED ANYMORE (USELESS): 'objh', ...                                                       
+  ... % CHANGE 190404  ver 4.0.0: NOT SAVED ANYMORE (USELESS): 'objn', ...                                                       
+  ... % CHANGE 190404  ver 4.0.0: NOT SAVED ANYMORE (USELESS): 'objw', ...                                                       
+  ... % CHANGE 190404  ver 4.0.0: NOT SAVED ANYMORE (USELESS): 'objx', ...                                                       
+  ... % CHANGE 190404  ver 4.0.0: NOT SAVED ANYMORE (USELESS): 'objy', ...                              
+  ... % CHANGE 190404  ver 4.0.0: NOT SAVED ANYMORE (USELESS): 'pos_axes', ...                                                   
+  ... % CHANGE 190404  ver 4.0.0: NOT SAVED ANYMORE (USELESS): 'pos_axes2', ...                                                  
+  ... % CHANGE 190404  ver 4.0.0: NOT SAVED ANYMORE (USELESS): 'pos_axis', ...                                                   
+  ... % CHANGE 190404  ver 4.0.0: NOT SAVED ANYMORE (USELESS): 'pos_panel', ...                                                  
+  ... % CHANGE 190404  ver 4.0.0: NOT SAVED ANYMORE (USELESS): 'pos_table', ...                                                  
   'poten', ...                                                     
   'prev_BEST_SINGLE_MISFIT', ...           
   'prev_BEST_SINGLE_MODELS', ...                                      
   'prev_MDLS', ...                                                    
   'prev_best_FDAT', ...                                               
   'prev_single_it', ...
-  'profile_ids', ... % (3D)                                                        
-  'profile_line', ... % (3D)                                                       
+  ...% CHANGE 190404  ver 4.0.0: 'profile_ids', ... % (3D)        is in P                                                
+  ...% CHANGE 190404  ver 4.0.0:  'profile_line', ... % (3D)       is in P                                                
   'property_1d_to_show', ...                                        
   'property_23d_to_show', ...     %(3D)
-  'r_distance_from_profile', ...  %(3D)
+  ...% CHANGE 190404  ver 4.0.0:  'r_distance_from_profile', ...  %(3D)  no more, or in P
   'r_reciprocicity', ...          %(3D)
   'receiver_locations', ...       %(3D)
-  'row', ...
+  ... % CHANGE 190404  ver 4.0.0: NOT SAVED ANYMORE (USELESS): 'row', ...
   'sensitivity_colormap', ...               
   'smoothing_radius', ...                                           
   'smoothing_strategy', ...                                         
   'sns_1d_to_show', ...                                             
-  'str', ...                                
+  ... % CHANGE 190404  ver 4.0.0: 'str', ...   NOT SAVED ANYMORE                             
   'sw_nmodes', ...                                                  
   'sw_nsmooth', ...                                                 
   'vala', ...                                                       
@@ -1969,375 +2248,687 @@ set(h_gui, 'ToolBar', 'none');
   'working_folder', ...                       
   'x', ...                                                          
   'xpositions', ...                           
-  'zlevels');
+  'zlevels', ...
+  'inversion_is_started__inedipendent', ...%                               From version 3.0.0
+  'inversion_is_started__global', ...%                                     From version 3.0.0
+  'P');%                                                                   From version 4.0.0
+
             fprintf('[Elaboration saved]\n')
         end
     end
     function Menu_Load_elaboration(~,~,~)
         [file,thispath] = uigetfile('*.mat','Resume Elaboration',strcat(working_folder,'/Elaboration.mat'));
-        
         if(file ~= 0)
-            datname = strcat(thispath,file);
+            datname = strcat(thispath,file);           
+            BIN = load(datname, '-mat');%% load the store data
             
-            %% load the store data
-            BIN = load(datname, '-mat');
-
-%% ========================================================================  
-%
-inversion_is_started__inedipendent= 'NA';% From version 3.0.0
-inversion_is_started__global      = 'NA';% From version 3.0.0
-
-
-%% if isfield(BIN,'');  = BIN.; end
-if isfield(BIN,'file'); file = BIN.file; end
-if isfield(BIN,'thispath'); thispath = BIN.thispath; end
-if isfield(BIN,'ui_dist'); ui_dist = BIN.ui_dist; end
-if isfield(BIN,'ui_ex'); ui_ex = BIN.ui_ex; end                
-if isfield(BIN,'ui_fref'); ui_fref = BIN.ui_fref; end 
-if isfield(BIN,'ui_frnge_1'); ui_frnge_1 = BIN.ui_frnge_1; end
-if isfield(BIN,'ui_frnge_2'); ui_frnge_2 = BIN.ui_frnge_2; end
-if isfield(BIN,'ui_frnge_d'); ui_frnge_d = BIN.ui_frnge_d; end
- if isfield(BIN,'ui_hh_pc'); ui_hh_pc = BIN.ui_hh_pc; end                  
-if isfield(BIN,'ui_qp_pc'); ui_qp_pc = BIN.ui_qp_pc; end                        
-if isfield(BIN,'ui_qp_ww'); ui_qp_ww = BIN.ui_qp_ww; end                       
-if isfield(BIN,'ui_qs_pc'); ui_qs_pc = BIN.ui_qs_pc; end
-if isfield(BIN,'ui_qs_ww'); ui_qs_ww = BIN.ui_qs_ww; end
-if isfield(BIN,'ui_ro_pc'); ui_ro_pc = BIN.ui_ro_pc; end
-if isfield(BIN,'ui_ro_ww'); ui_ro_ww = BIN.ui_ro_ww; end
-if isfield(BIN,'ui_vp_pc'); ui_vp_pc = BIN.ui_vp_pc; end 
-if isfield(BIN,'ui_vp_ww'); ui_vp_ww = BIN.ui_vp_ww; end
-if isfield(BIN,'ui_vs_pc'); ui_vs_pc = BIN.ui_vs_pc; end
-if isfield(BIN,'ui_vs_ww'); ui_vs_ww = BIN.ui_vs_ww; end
-%   ---- gui_3D ----------------------------------------------------------------------------
-if isfield(BIN,'BEST_ENERGIES'); BEST_ENERGIES = BIN.BEST_ENERGIES; end
-if isfield(BIN,'BEST_MISFITS'); BEST_MISFITS = BIN.BEST_MISFITS; end
-if isfield(BIN,'BEST_MODELS'); BEST_MODELS = BIN.BEST_MODELS; end
-if isfield(BIN,'BEST_SINGLE_MISFIT'); BEST_SINGLE_MISFIT = BIN.BEST_SINGLE_MISFIT; end
-if isfield(BIN,'BEST_SINGLE_MODELS'); BEST_SINGLE_MODELS = BIN.BEST_SINGLE_MODELS; end
-if isfield(BIN,'BREAKS'); BREAKS = BIN.BREAKS; end
-%
-if isfield(BIN,'CW'); CW = BIN.CW; end
-if isfield(BIN,'DISCARDS'); DISCARDS = BIN.DISCARDS; end
-if isfield(BIN,'DL'); DL = BIN.DL; end
-if isfield(BIN,'DSP'); DSP = BIN.DSP; end
-if isfield(BIN,'DW'); DW = BIN.DW; end
-if isfield(BIN,'FDAT'); FDAT = BIN.FDAT; end
-if isfield(BIN,'FLAG__PC_features'); FLAG__PC_features = BIN.FLAG__PC_features; end
-if isfield(BIN,'HQEpicDistance'); HQEpicDistance = BIN.HQEpicDistance; end
-if isfield(BIN,'HQFocalDepth'); HQFocalDepth = BIN.HQFocalDepth; end
-if isfield(BIN,'HQMagnitude'); HQMagnitude = BIN.HQMagnitude; end
-if isfield(BIN,'HQRockRatio'); HQRockRatio = BIN.HQRockRatio; end
-if isfield(BIN,'HQfreq'); HQfreq = BIN.HQfreq; end
-if isfield(BIN,'LKT'); LKT = BIN.LKT; end
-if isfield(BIN,'MDLS'); MDLS = BIN.MDLS; end
-if isfield(BIN,'MODELS'); MODELS = BIN.MODELS; end
-if isfield(BIN,'Matlab_Release'); Matlab_Release = BIN.Matlab_Release; end
-if isfield(BIN,'Misfit_curve_term_w'); Misfit_curve_term_w = BIN.Misfit_curve_term_w; end
-if isfield(BIN,'Misfit_slope_term_w'); Misfit_slope_term_w = BIN.Misfit_slope_term_w; end
-if isfield(BIN,'Misfit_vs_Iter'); Misfit_vs_Iter = BIN.Misfit_vs_Iter; end
-if isfield(BIN,'NresultsToKeep'); NresultsToKeep = BIN.NresultsToKeep; end
-if isfield(BIN,'Nrowa'); Nrowa = BIN.Nrowa; end
-if isfield(BIN,'QHspec'); QHspec = BIN.QHspec; end
-if isfield(BIN,'QPList'); QPList = BIN.QPList; end % (3D)
-if isfield(BIN,'QSList'); QSList = BIN.QSList; end % (3D)
-if isfield(BIN,'RCT'); RCT = BIN.RCT; end
-if isfield(BIN,'REFERENCE_MODEL_dH'); REFERENCE_MODEL_dH = BIN.REFERENCE_MODEL_dH; end
-if isfield(BIN,'REFERENCE_MODEL_zpoints'); REFERENCE_MODEL_zpoints = BIN.REFERENCE_MODEL_zpoints; end
-if isfield(BIN,'ROList'); ROList = BIN.ROList; end
-if isfield(BIN,'S'); S = BIN.S; end
-if isfield(BIN,'SN_centralval'); SN_centralval = BIN.SN_centralval; end
-if isfield(BIN,'SN_dtamsf'); SN_dtamsf = BIN.SN_dtamsf; end
-if isfield(BIN,'SN_parname'); SN_parname = BIN.SN_parname; end
-if isfield(BIN,'SN_parscale'); SN_parscale = BIN.SN_parscale; end
-if isfield(BIN,'SN_xscale'); SN_xscale = BIN.SN_xscale; end
-if isfield(BIN,'STORED_1d_daf_fits'); STORED_1d_daf_fits = BIN.STORED_1d_daf_fits; end
-if isfield(BIN,'STORED_1d_hh_fits'); STORED_1d_hh_fits = BIN.STORED_1d_hh_fits; end
-if isfield(BIN,'STORED_1d_qp_fits'); STORED_1d_qp_fits = BIN.STORED_1d_qp_fits; end
-if isfield(BIN,'STORED_1d_qs_fits'); STORED_1d_qs_fits = BIN.STORED_1d_qs_fits; end
-if isfield(BIN,'STORED_1d_ro_fits'); STORED_1d_ro_fits = BIN.STORED_1d_ro_fits; end
-if isfield(BIN,'STORED_1d_vp_fits'); STORED_1d_vp_fits = BIN.STORED_1d_vp_fits; end
-if isfield(BIN,'STORED_1d_vs_fits'); STORED_1d_vs_fits = BIN.STORED_1d_vs_fits; end
-if isfield(BIN,'STORED_2d_daf_fits'); STORED_2d_daf_fits = BIN.STORED_2d_daf_fits; end
-if isfield(BIN,'STORED_2d_hh_fits'); STORED_2d_hh_fits = BIN.STORED_2d_hh_fits; end
-if isfield(BIN,'STORED_2d_qp_fits'); STORED_2d_qp_fits = BIN.STORED_2d_qp_fits; end
-if isfield(BIN,'STORED_2d_qs_fits'); STORED_2d_qs_fits = BIN.STORED_2d_qs_fits; end
-if isfield(BIN,'STORED_2d_ro_fits'); STORED_2d_ro_fits = BIN.STORED_2d_ro_fits; end
-if isfield(BIN,'STORED_2d_vp_fits'); STORED_2d_vp_fits = BIN.STORED_2d_vp_fits; end
-if isfield(BIN,'STORED_2d_vs_fits'); STORED_2d_vs_fits = BIN.STORED_2d_vs_fits; end
-if isfield(BIN,'STORED_RESULTS_1d_misfit'); STORED_RESULTS_1d_misfit = BIN.STORED_RESULTS_1d_misfit; end
-if isfield(BIN,'STORED_RESULTS_2d_misfit'); STORED_RESULTS_2d_misfit = BIN.STORED_RESULTS_2d_misfit; end
-if isfield(BIN,'STORED_RESULTS_2d_misfit_profile'); STORED_RESULTS_2d_misfit_profile = BIN.STORED_RESULTS_2d_misfit_profile; end
-if isfield(BIN,'SURVEYS'); SURVEYS = BIN.SURVEYS; end
-% NO Slider0     (3D)                                                       
-% NO Slider0b    (3D)                                                           
-% NO Slider1     (3D)                                                            
-% NO Slider1b    (3D)                                                           
-% NO Slider2     (3D)                                                            
-% NO Slider2b    (3D)
-% NO  if isfield(BIN,'T2_P1_global_it_count'); T2_P1_global_it_count = BIN.T2_P1_global_it_count; end
-% NO  if isfield(BIN,'T2_P1_max_it'); T2_P1_max_it = BIN.T2_P1_max_it; end
-% NO  if isfield(BIN,'T3_P1_inv'); T3_P1_inv = BIN.T3_P1_inv; end
-% NO  if isfield(BIN,'T3_P1_invSW'); T3_P1_invSW = BIN.T3_P1_invSW; end
-% NO  if isfield(BIN,'T3_P1_it_count'); T3_P1_it_count = BIN.T3_P1_it_count; end
-% NO  if isfield(BIN,'T3_P1_max_it'); T3_P1_max_it = BIN.T3_P1_max_it; end
-% NO  if isfield(BIN,'T3_P1_txt'); T3_P1_txt = BIN.T3_P1_txt; end
-% NO  if isfield(BIN,'T3_p1_revert'); T3_p1_revert = BIN.T3_p1_revert; end
-% NO  if isfield(BIN,'T5_P1_HsMask'); T5_P1_HsMask = BIN.T5_P1_HsMask; end
-% NO  if isfield(BIN,'T5_P1_txtx'); T5_P1_txtx = BIN.T5_P1_txtx; end
-% NO  if isfield(BIN,'T5_P1_txty'); T5_P1_txty = BIN.T5_P1_txty; end
-% NO  if isfield(BIN,'T6_P1_txtx'); T6_P1_txtx = BIN.T6_P1_txtx; end
-if isfield(BIN,'TO_INVERT'); TO_INVERT = BIN.TO_INVERT; end
-if isfield(BIN,'VPList'); VPList = BIN.VPList; end % (3D)
-if isfield(BIN,'VSList'); VSList = BIN.VSList; end % (3D)
-if isfield(BIN,'X1'); X1 = BIN.X1; end
-if isfield(BIN,'X2'); X2 = BIN.X2; end
-if isfield(BIN,'ZZList'); ZZList = BIN.ZZList; end % (3D)
-% NO  if isfield(BIN,'ans'); ans = BIN.ans; end
-if isfield(BIN,'appname'); appname = BIN.appname; end
-if isfield(BIN,'basevalue'); basevalue = BIN.basevalue; end
-if isfield(BIN,'basevaluew'); basevaluew = BIN.basevaluew; end
-if isfield(BIN,'bedrock'); bedrock = BIN.bedrock; end
-if isfield(BIN,'best_FDAT'); best_FDAT = BIN.best_FDAT; end
-if isfield(BIN,'beta_stuff_enable_status'); beta_stuff_enable_status = BIN.beta_stuff_enable_status; end
-%  (2D)
-if isfield(BIN,'conf_1d_to_show_x'); conf_1d_to_show_x = BIN.conf_1d_to_show_x; end
-if isfield(BIN,'conf_1d_to_show_y'); conf_1d_to_show_y = BIN.conf_1d_to_show_y; end
-if isfield(BIN,'confidence_colormap'); confidence_colormap = BIN.confidence_colormap; end
-if isfield(BIN,'curve_plotmode'); curve_plotmode = BIN.curve_plotmode; end
-if isfield(BIN,'curve_weights_plotmode'); curve_weights_plotmode = BIN.curve_weights_plotmode; end
-if isfield(BIN,'data_1d_to_show'); data_1d_to_show = BIN.data_1d_to_show; end
-%    cutplanes (load no need)
-if isfield(BIN,'datafile_columns'); datafile_columns = BIN.datafile_columns; end
-if isfield(BIN,'datafile_separator'); datafile_separator = BIN.datafile_separator; end
-if isfield(BIN,'default_colormap'); default_colormap = BIN.default_colormap; end
-if isfield(BIN,'depth_weights_plotmode'); depth_weights_plotmode = BIN.depth_weights_plotmode; end
-if isfield(BIN,'dh'); dh = BIN.dh; end
-if isfield(BIN,'dim'); dim = BIN.dim; end % (3D)
-if isfield(BIN,'dw'); dw = BIN.dw; end
-if isfield(BIN,'dx'); dx = BIN.dx; end
-% NO  if isfield(BIN,'eh52'); eh52 = BIN.eh52; end
-% NO  if isfield(BIN,'eh52_childs'); eh52_childs = BIN.eh52_childs; end
-if isfield(BIN,'enable_menu'); enable_menu = BIN.enable_menu; end
-if isfield(BIN,'fontsizeis'); fontsizeis = BIN.fontsizeis; end
-if isfield(BIN,'gapx'); gapx = BIN.gapx; end
-if isfield(BIN,'global_inversion_step'); global_inversion_step = BIN.global_inversion_step; end
-% %   h0                                                         
-% %   h1                                                         
-% %   h10                                                        
-% %   h5                                                         
-% %   h51                                                        
-% %   h52                                                        
-% %   h5_1                                                       
-% %   h7                                                         
-% %   hAx_1d_confidence                                          
-% %   hAx_1dprof                                                 
-% %   hAx_1dprof_hcmenu                                          
-% %   hAx_2Dprof                                                 
-% %   hAx_2dprof_hcmenu                                          
-% %   hAx_MvsIT                                                  
-% %   hAx_MvsIT_hcmenu                                           
-% %   hAx_cnf_hcmenu                                             
-% %   hAx_cwf                                                    
-% %   hAx_cwf_hcmenu                                             
-% %   hAx_dat                                                    
-% %   hAx_dat_hcmenu                                             
-% %   hAx_dwf                                                    
-% %   hAx_dwf_hcmenu                                             
-% %   hAx_geo                                                    
-% %   hAx_geo_hcmenu                                             
-% %   hAx_sensitivity                                            
-% %   hAx_sns_hcmenu                                             
-% %   hRand                                                      
-% %   hT2_P1                                                     
-% %   hT2_P2                                                     
-% %   hT2_P3                                                     
-% %   hT3_P1                                                     
-% %   hT3_P2                                                     
-% %   hT3_P3                                                     
-% %   hT3_P4                                                     
-% %   hT4_P1                                                     
-% %   hT4_P2                                                     
-% %   hT5_PA                                                     
-% %   hT5_PB                                                     
-% %   hT5_PC                                                     
-% %   hT5_PD                                                     
-% %   hT6_PA                                                     
-% %   hT6_PC                                                     
-% %   hTabGroup                                                  
-% %   hTab_1d_viewer                                             
-% %   hTab_2d_viewer                                             
-% %   hTab_Confidenc                                             
-% %   hTab_Inversion                                             
-% %   hTab_Sensitivt                                             
-% %   hTab_mod                                                   
-% %   hTab_mod_cnames                                    
-% %   hTab_mod_hcmenu                                            
-% %   h_1d_next                                                  
-% %   h_1d_prev                                                  
-% %   h_dscale                                                   
-% %   h_ex_val                                                   
-% %   h_fref_val                                                 
-% %   h_fwd_sw                                                   
-% %   h_gui                                                      
-% %   h_hh_val                                                   
-% %   h_qp_val                                                   
-% %   h_qp_w                                                     
-% %   h_qs_val                                                   
-% %   h_qs_w                                                     
-% %   h_realtime                                                 
-% %   h_ro_val                                                   
-% %   h_ro_w                                                     
-% %   h_scale_max                                                
-% %   h_scale_min
-% %   h_view_rotation       (3D)
-% %   h_vp_val                                                   
-% %   h_vp_w                                                     
-% %   h_vs_val                                                   
-% %   h_vs_w                                                     
-% %   hconf_nlevels                                              
-% %   hconf_nsmooth                                              
-% %   hconf_xlay                                                 
-% %   hconf_xprop                                                
-% %   hconf_ylay                                                 
-% %   hconf_yprop                                                
-% %   hsns_bound                                                 
-% %   hsns_nlevels                                               
-% %   hsns_step                                                  
-% %   hsns_xlay                                                  
-% %   hsns_xprop                                                 
-if isfield(BIN,'i'); i = BIN.i; end
-if isfield(BIN,'id'); id = BIN.id; end
-if isfield(BIN,'independent_optimiazation_cicles'); independent_optimiazation_cicles = BIN.independent_optimiazation_cicles; end
-if isfield(BIN,'init_single_FDAT'); init_single_FDAT = BIN.init_single_FDAT; end
-if isfield(BIN,'init_value__dscale'); init_value__dscale = BIN.init_value__dscale; end
-if isfield(BIN,'init_value__fref'); init_value__fref = BIN.init_value__fref; end
-if isfield(BIN,'init_value__max_scale'); init_value__max_scale = BIN.init_value__max_scale; end
-if isfield(BIN,'init_value__min_scale'); init_value__min_scale = BIN.init_value__min_scale; end
-if isfield(BIN,'ixmax_id'); ixmax_id = BIN.ixmax_id; end
-if isfield(BIN,'ixmin_id'); ixmin_id = BIN.ixmin_id; end
-if isfield(BIN,'last_FDAT'); last_FDAT = BIN.last_FDAT; end
-if isfield(BIN,'last_MDLS'); last_MDLS = BIN.last_MDLS; end
-if isfield(BIN,'last_log_number'); last_log_number = BIN.last_log_number; end
-if isfield(BIN,'last_project_name'); last_project_name = BIN.last_project_name; end
-if isfield(BIN,'last_single_FDAT'); last_single_FDAT = BIN.last_single_FDAT; end
-if isfield(BIN,'last_single_MDL'); last_single_MDL = BIN.last_single_MDL; end
-if isfield(BIN,'lsmooth'); lsmooth = BIN.lsmooth; end
-if isfield(BIN,'main_b'); main_b = BIN.main_b; end
-if isfield(BIN,'main_h'); main_h = BIN.main_h; end
-if isfield(BIN,'main_l'); main_l = BIN.main_l; end
-if isfield(BIN,'main_scale'); main_scale = BIN.main_scale; end
-if isfield(BIN,'main_w'); main_w = BIN.main_w; end
-if isfield(BIN,'max_H'); max_H = BIN.max_H; end
-if isfield(BIN,'max_lat_dH'); max_lat_dH = BIN.max_lat_dH; end
-if isfield(BIN,'max_lat_dQp'); max_lat_dQp = BIN.max_lat_dQp; end
-if isfield(BIN,'max_lat_dQs'); max_lat_dQs = BIN.max_lat_dQs; end
-if isfield(BIN,'max_lat_dRo'); max_lat_dRo = BIN.max_lat_dRo; end
-if isfield(BIN,'max_lat_dVp'); max_lat_dVp = BIN.max_lat_dVp; end
-if isfield(BIN,'max_lat_dVs'); max_lat_dVs = BIN.max_lat_dVs; end
-if isfield(BIN,'max_qp_qs_ratio'); max_qp_qs_ratio = BIN.max_qp_qs_ratio; end
-if isfield(BIN,'max_qs'); max_qs = BIN.max_qs; end
-if isfield(BIN,'max_ro'); max_ro = BIN.max_ro; end
-if isfield(BIN,'max_vp_vs_ratio'); max_vp_vs_ratio = BIN.max_vp_vs_ratio; end
-if isfield(BIN,'min_H'); min_H = BIN.min_H; end
-if isfield(BIN,'min_qp_qs_ratio'); min_qp_qs_ratio = BIN.min_qp_qs_ratio; end
-if isfield(BIN,'min_qs'); min_qs = BIN.min_qs; end
-if isfield(BIN,'min_ro'); min_r = BIN.min_ro; end
-if isfield(BIN,'min_vp_vs_ratio'); min_vp_vs_ratio = BIN.min_vp_vs_ratio; end
-if isfield(BIN,'min_vs'); min_vs = BIN.min_vs; end
-if isfield(BIN,'misfit_over_sumweight'); misfit_over_sumweight = BIN.misfit_over_sumweight; end
-if isfield(BIN,'modl_FDAT'); modl_FDAT = BIN.modl_FDAT; end
-if isfield(BIN,'modl_FDATSW'); modl_FDATSW = BIN.modl_FDATSW; end
-if isfield(BIN,'n'); n = BIN.n; end
-if isfield(BIN,'n_depth_levels'); n_depth_levels = BIN.n_depth_levels; end
-if isfield(BIN,'ndegfree'); ndegfree = BIN.ndegfree; end
-if isfield(BIN,'nlaya'); nlaya = BIN.nlaya; end
-if isfield(BIN,'nlayb'); nlayb = BIN.nlayb; end
-if isfield(BIN,'nlvl'); nlvl = BIN.nlvl; end
-if isfield(BIN,'nx_ticks'); nx_ticks = BIN.nx_ticks; end
-if isfield(BIN,'ny_ticks'); ny_ticks = BIN.ny_ticks; end
-if isfield(BIN,'nz_ticks'); nz_ticks = BIN.nz_ticks; end
-if isfield(BIN,'objh'); objh = BIN.objh; end
-if isfield(BIN,'objn'); objn = BIN.objn; end
-if isfield(BIN,'objw'); objw = BIN.objw; end
-if isfield(BIN,'objx'); objx = BIN.objx; end
-if isfield(BIN,'objy'); objy = BIN.objy; end
-if isfield(BIN,'pos_axes'); pos_axes = BIN.pos_axes; end
-if isfield(BIN,'pos_axes2'); pos_axes2 = BIN.pos_axes2; end
-if isfield(BIN,'pos_axis'); pos_axis = BIN.pos_axis; end
-if isfield(BIN,'pos_panel'); pos_panel = BIN.pos_panel; end
-if isfield(BIN,'pos_table'); pos_table = BIN.pos_table; end
-if isfield(BIN,'poten'); poten = BIN.poten; end
-if isfield(BIN,'prev_BEST_SINGLE_MISFIT'); prev_BEST_SINGLE_MISFIT = BIN.prev_BEST_SINGLE_MISFIT; end
-if isfield(BIN,'prev_BEST_SINGLE_MODELS'); prev_BEST_SINGLE_MODELS = BIN.prev_BEST_SINGLE_MODELS; end
-if isfield(BIN,'prev_MDLS'); prev_MDLS = BIN.prev_MDLS; end
-if isfield(BIN,'prev_best_FDAT'); prev_best_FDAT = BIN.prev_best_FDAT; end
-if isfield(BIN,'prev_single_it'); prev_single_it = BIN.prev_single_it; end
-if isfield(BIN,'profile_ids')  profile_ids = BIN.profile_ids; end% (3D)                                                        
-if isfield(BIN,'profile_line') profile_line= BIN.profile_line; end% (3D) 
-if isfield(BIN,'property_1d_to_show'); property_1d_to_show = BIN.property_1d_to_show; end
-if isfield(BIN,'property_23d_to_show'); property_23d_to_show = BIN.property_23d_to_show; end% (3D)
-if isfield(BIN,'r_distance_from_profile')  r_distance_from_profile= BIN.r_distance_from_profile; end % (3D)
-if isfield(BIN,'r_reciprocicity')          r_reciprocicity= BIN.r_reciprocicity; end % (3D)
-if isfield(BIN,'receiver_locations')       receiver_locations= BIN.receiver_locations; end % (3D)
-if isfield(BIN,'row'); row = BIN.row; end
-if isfield(BIN,'sensitivity_colormap'); sensitivity_colormap = BIN.sensitivity_colormap; end
-if isfield(BIN,'smoothing_radius'); smoothing_radius = BIN.smoothing_radius; end
-if isfield(BIN,'smoothing_strategy'); smoothing_strategy = BIN.smoothing_strategy; end
-if isfield(BIN,'sns_1d_to_show'); sns_1d_to_show = BIN.sns_1d_to_show; end
-if isfield(BIN,'str'); str = BIN.str; end
-if isfield(BIN,'sw_nmodes'); sw_nmodes = BIN.sw_nmodes; end
-if isfield(BIN,'sw_nsmooth'); sw_nsmooth = BIN.sw_nsmooth; end
-if isfield(BIN,'vala'); vala = BIN.vala; end
-if isfield(BIN,'valb'); valb = BIN.valb; end
-if isfield(BIN,'var1'); var1 = BIN.var1; end
-if isfield(BIN,'var2'); var2 = BIN.var2; end
-if isfield(BIN,'version'); version = BIN.version; end
-if isfield(BIN,'vfst_MDLS'); vfst_MDLS = BIN.vfst_MDLS; end
-if isfield(BIN,'view_max_scale'); view_max_scale = BIN.view_max_scale; end
-if isfield(BIN,'view_min_scale'); view_min_scale = BIN.view_min_scale; end
-if isfield(BIN,'viewerview');     viewerview = BIN.viewerview; end  %(3D)
-if isfield(BIN,'weight_curv');    weight_curv = BIN.weight_curv; end
-if isfield(BIN,'weight_dpth');    weight_dpth = BIN.weight_dpth; end
-if isfield(BIN,'working_folder'); working_folder = BIN.working_folder; end
-if isfield(BIN,'x'); x = BIN.x; end
-if isfield(BIN,'xpositions'); xpositions = BIN.xpositions; end
-if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
-%% ========================================================================
-
-            %% Update Interface
-            set(hRand,    'Value',    BIN.ui_dist);
-            set(h_hh_val, 'String',   BIN.ui_hh_pc);
-
-            set(h_vp_val, 'String',   BIN.ui_vp_pc);
-            set(h_vp_w,   'String',   BIN.ui_vp_ww);
-
-            set(h_vp_val, 'String',   BIN.ui_vp_pc);
-            set(h_vp_w,   'String',   BIN.ui_vp_ww);
-
-            set(h_vs_val, 'String',   BIN.ui_vs_pc);
-            set(h_vs_w,   'String',   BIN.ui_vs_ww);
-
-            set(h_ro_val, 'String',   BIN.ui_ro_pc);
-            set(h_ro_w,   'String',   BIN.ui_ro_ww);
-
-            set(h_qp_val, 'String',   BIN.ui_qp_pc);
-            set(h_qp_w,   'String',   BIN.ui_qp_ww);
-
-            set(h_qs_val, 'String',   BIN.ui_qs_pc);
-            set(h_qs_w,   'String',   BIN.ui_qs_ww);
-
-            set(h_ex_val,   'String',   BIN.ui_ex);
-            set(h_fref_val, 'String',   BIN.ui_fref);
-            set(h_scale_min,'String',   BIN.ui_frnge_1);
-            set(h_scale_max,'String',   BIN.ui_frnge_2);
-            set(h_dscale,   'String',   BIN.ui_frnge_d);
+            %% Data archive version I:(first pubblication to version 3.0.0) 
+            if ~isfield(BIN,'OpenHVSR_elaboration_file_version')
+                fprintf('Loading archive version-I: (Up to V3.0.0)\n')
+                %% if isfield(BIN,'');  = BIN.; end
+                if isfield(BIN,'file'); file = BIN.file; end
+                if isfield(BIN,'thispath'); thispath = BIN.thispath; end
+                
+                %   ---- gui_3D ----------------------------------------------------------------------------
+                if isfield(BIN,'BEST_ENERGIES'); BEST_ENERGIES = BIN.BEST_ENERGIES; end
+                if isfield(BIN,'BEST_MISFITS'); BEST_MISFITS = BIN.BEST_MISFITS; end
+                if isfield(BIN,'BEST_MODELS'); BEST_MODELS = BIN.BEST_MODELS; end
+                if isfield(BIN,'BEST_SINGLE_MISFIT'); BEST_SINGLE_MISFIT = BIN.BEST_SINGLE_MISFIT; end
+                if isfield(BIN,'BEST_SINGLE_MODELS'); BEST_SINGLE_MODELS = BIN.BEST_SINGLE_MODELS; end
+                if isfield(BIN,'BREAKS'); BREAKS = BIN.BREAKS; end
+                %
+                if isfield(BIN,'CW'); CW = BIN.CW; end
+                if isfield(BIN,'DISCARDS'); DISCARDS = BIN.DISCARDS; end
+                if isfield(BIN,'DL'); DL = BIN.DL; end
+                if isfield(BIN,'DSP'); DSP = BIN.DSP; end
+                if isfield(BIN,'DW'); DW = BIN.DW; end
+                if isfield(BIN,'FDAT'); FDAT = BIN.FDAT; end
+                if isfield(BIN,'FLAG__PC_features'); FLAG__PC_features = BIN.FLAG__PC_features; end
+                if isfield(BIN,'HQEpicDistance'); HQEpicDistance = BIN.HQEpicDistance; end
+                if isfield(BIN,'HQFocalDepth'); HQFocalDepth = BIN.HQFocalDepth; end
+                if isfield(BIN,'HQMagnitude'); HQMagnitude = BIN.HQMagnitude; end
+                if isfield(BIN,'HQRockRatio'); HQRockRatio = BIN.HQRockRatio; end
+                if isfield(BIN,'HQfreq'); HQfreq = BIN.HQfreq; end
+                if isfield(BIN,'LKT'); LKT = BIN.LKT; end
+                if isfield(BIN,'MDLS'); MDLS = BIN.MDLS; end
+                if isfield(BIN,'MODELS'); MODELS = BIN.MODELS; end
+                if isfield(BIN,'Matlab_Release'); Matlab_Release = BIN.Matlab_Release; end
+                if isfield(BIN,'Misfit_curve_term_w'); Misfit_curve_term_w = BIN.Misfit_curve_term_w; end
+                if isfield(BIN,'Misfit_slope_term_w'); Misfit_slope_term_w = BIN.Misfit_slope_term_w; end
+                if isfield(BIN,'Misfit_vs_Iter'); Misfit_vs_Iter = BIN.Misfit_vs_Iter; end
+                if isfield(BIN,'NresultsToKeep'); NresultsToKeep = BIN.NresultsToKeep; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'Nrowa'); Nrowa = BIN.Nrowa; end
+                if isfield(BIN,'QHspec'); QHspec = BIN.QHspec; end
+                if isfield(BIN,'QPList'); QPList = BIN.QPList; end % (3D)
+                if isfield(BIN,'QSList'); QSList = BIN.QSList; end % (3D)
+                if isfield(BIN,'RCT'); RCT = BIN.RCT; end
+                if isfield(BIN,'REFERENCE_MODEL_dH'); REFERENCE_MODEL_dH = BIN.REFERENCE_MODEL_dH; end
+                if isfield(BIN,'REFERENCE_MODEL_zpoints'); REFERENCE_MODEL_zpoints = BIN.REFERENCE_MODEL_zpoints; end
+                if isfield(BIN,'ROList'); ROList = BIN.ROList; end
+                if isfield(BIN,'S'); S = BIN.S; end
+                if isfield(BIN,'SN_centralval'); SN_centralval = BIN.SN_centralval; end
+                if isfield(BIN,'SN_dtamsf'); SN_dtamsf = BIN.SN_dtamsf; end
+                if isfield(BIN,'SN_parname'); SN_parname = BIN.SN_parname; end
+                if isfield(BIN,'SN_parscale'); SN_parscale = BIN.SN_parscale; end
+                if isfield(BIN,'SN_xscale'); SN_xscale = BIN.SN_xscale; end
+                if isfield(BIN,'STORED_1d_daf_fits'); STORED_1d_daf_fits = BIN.STORED_1d_daf_fits; end
+                if isfield(BIN,'STORED_1d_hh_fits'); STORED_1d_hh_fits = BIN.STORED_1d_hh_fits; end
+                if isfield(BIN,'STORED_1d_qp_fits'); STORED_1d_qp_fits = BIN.STORED_1d_qp_fits; end
+                if isfield(BIN,'STORED_1d_qs_fits'); STORED_1d_qs_fits = BIN.STORED_1d_qs_fits; end
+                if isfield(BIN,'STORED_1d_ro_fits'); STORED_1d_ro_fits = BIN.STORED_1d_ro_fits; end
+                if isfield(BIN,'STORED_1d_vp_fits'); STORED_1d_vp_fits = BIN.STORED_1d_vp_fits; end
+                if isfield(BIN,'STORED_1d_vs_fits'); STORED_1d_vs_fits = BIN.STORED_1d_vs_fits; end
+                if isfield(BIN,'STORED_2d_daf_fits'); STORED_2d_daf_fits = BIN.STORED_2d_daf_fits; end
+                if isfield(BIN,'STORED_2d_hh_fits'); STORED_2d_hh_fits = BIN.STORED_2d_hh_fits; end
+                if isfield(BIN,'STORED_2d_qp_fits'); STORED_2d_qp_fits = BIN.STORED_2d_qp_fits; end
+                if isfield(BIN,'STORED_2d_qs_fits'); STORED_2d_qs_fits = BIN.STORED_2d_qs_fits; end
+                if isfield(BIN,'STORED_2d_ro_fits'); STORED_2d_ro_fits = BIN.STORED_2d_ro_fits; end
+                if isfield(BIN,'STORED_2d_vp_fits'); STORED_2d_vp_fits = BIN.STORED_2d_vp_fits; end
+                if isfield(BIN,'STORED_2d_vs_fits'); STORED_2d_vs_fits = BIN.STORED_2d_vs_fits; end
+                if isfield(BIN,'STORED_RESULTS_1d_misfit'); STORED_RESULTS_1d_misfit = BIN.STORED_RESULTS_1d_misfit; end
+                if isfield(BIN,'STORED_RESULTS_2d_misfit'); STORED_RESULTS_2d_misfit = BIN.STORED_RESULTS_2d_misfit; end
+                if isfield(BIN,'STORED_RESULTS_2d_misfit_profile'); STORED_RESULTS_2d_misfit_profile = BIN.STORED_RESULTS_2d_misfit_profile; end
+                if isfield(BIN,'SURVEYS'); SURVEYS = BIN.SURVEYS; end
+                % NO Slider0     (3D)                                                       
+                % NO Slider0b    (3D)                                                           
+                % NO Slider1     (3D)                                                            
+                % NO Slider1b    (3D)                                                           
+                % NO Slider2     (3D)                                                            
+                % NO Slider2b    (3D)
+                % NO  if isfield(BIN,'T2_P1_global_it_count'); T2_P1_global_it_count = BIN.T2_P1_global_it_count; end
+                % NO  if isfield(BIN,'T2_P1_max_it'); T2_P1_max_it = BIN.T2_P1_max_it; end
+                % NO  if isfield(BIN,'T3_P1_inv'); T3_P1_inv = BIN.T3_P1_inv; end
+                % NO  if isfield(BIN,'T3_P1_invSW'); T3_P1_invSW = BIN.T3_P1_invSW; end
+                % NO  if isfield(BIN,'T3_P1_it_count'); T3_P1_it_count = BIN.T3_P1_it_count; end
+                % NO  if isfield(BIN,'T3_P1_max_it'); T3_P1_max_it = BIN.T3_P1_max_it; end
+                % NO  if isfield(BIN,'T3_P1_txt'); T3_P1_txt = BIN.T3_P1_txt; end
+                % NO  if isfield(BIN,'T3_p1_revert'); T3_p1_revert = BIN.T3_p1_revert; end
+                % NO  if isfield(BIN,'T5_P1_HsMask'); T5_P1_HsMask = BIN.T5_P1_HsMask; end
+                % NO  if isfield(BIN,'T5_P1_txtx'); T5_P1_txtx = BIN.T5_P1_txtx; end
+                % NO  if isfield(BIN,'T5_P1_txty'); T5_P1_txty = BIN.T5_P1_txty; end
+                % NO  if isfield(BIN,'T6_P1_txtx'); T6_P1_txtx = BIN.T6_P1_txtx; end
+                if isfield(BIN,'TO_INVERT'); TO_INVERT = BIN.TO_INVERT; end
+                if isfield(BIN,'VPList'); VPList = BIN.VPList; end % (3D)
+                if isfield(BIN,'VSList'); VSList = BIN.VSList; end % (3D)
+                if isfield(BIN,'X1'); X1 = BIN.X1; end
+                if isfield(BIN,'X2'); X2 = BIN.X2; end
+                if isfield(BIN,'ZZList'); ZZList = BIN.ZZList; end % (3D)
+                % NO  if isfield(BIN,'ans'); ans = BIN.ans; end
+                if isfield(BIN,'appname'); appname = BIN.appname; end
+                if isfield(BIN,'basevalue'); basevalue = BIN.basevalue; end
+                if isfield(BIN,'basevaluew'); basevaluew = BIN.basevaluew; end
+                if isfield(BIN,'bedrock'); bedrock = BIN.bedrock; end
+                if isfield(BIN,'best_FDAT'); best_FDAT = BIN.best_FDAT; end
+                %190404 if isfield(BIN,'beta_stuff_enable_status'); beta_stuff_enable_status = BIN.beta_stuff_enable_status; end
+                if isfield(BIN,'P.ExtraFeatures.beta_stuff_enable_status'); P.ExtraFeatures.beta_stuff_enable_status = BIN.P.ExtraFeatures.beta_stuff_enable_status; end
+                %  (2D)
+                if isfield(BIN,'conf_1d_to_show_x'); conf_1d_to_show_x = BIN.conf_1d_to_show_x; end
+                if isfield(BIN,'conf_1d_to_show_y'); conf_1d_to_show_y = BIN.conf_1d_to_show_y; end
+                if isfield(BIN,'confidence_colormap'); confidence_colormap = BIN.confidence_colormap; end
+                if isfield(BIN,'curve_plotmode'); curve_plotmode = BIN.curve_plotmode; end
+                if isfield(BIN,'curve_weights_plotmode'); curve_weights_plotmode = BIN.curve_weights_plotmode; end
+                %% FIX if isfield(BIN,'P.isshown.id'); P.isshown.id = BIN.P.isshown.id; end
+                %190404 if isfield(BIN,'data_1d_to_show'); data_1d_to_show = BIN.data_1d_to_show; end
+                %    cutplanes (load no need)
+                if isfield(BIN,'datafile_columns'); datafile_columns = BIN.datafile_columns; end
+                if isfield(BIN,'datafile_separator'); datafile_separator = BIN.datafile_separator; end
+                if isfield(BIN,'default_colormap'); default_colormap = BIN.default_colormap; end
+                if isfield(BIN,'depth_weights_plotmode'); depth_weights_plotmode = BIN.depth_weights_plotmode; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'dh'); dh = BIN.dh; end
+                if isfield(BIN,'dim'); dim = BIN.dim; end % (3D)
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'dw'); dw = BIN.dw; end
+                if isfield(BIN,'dx'); dx = BIN.dx; end
+                % NO  if isfield(BIN,'eh52'); eh52 = BIN.eh52; end
+                % NO  if isfield(BIN,'eh52_childs'); eh52_childs = BIN.eh52_childs; end
+                % 180323  if isfield(BIN,'enable_menu'); enable_menu = BIN.enable_menu; end
+                % 180323  if isfield(BIN,'fontsizeis'); fontsizeis = BIN.fontsizeis; end
+                if isfield(BIN,'gapx'); gapx = BIN.gapx; end
+                if isfield(BIN,'global_inversion_step'); global_inversion_step = BIN.global_inversion_step; end
+                % %   h0                                                         
+                % %   h1                                                         
+                % %   h10                                                        
+                % %   h5                                                         
+                % %   h51                                                        
+                % %   h52                                                        
+                % %   h5_1                                                       
+                % %   h7                                                         
+                % %   hAx_1d_confidence                                          
+                % %   hAx_1dprof                                                 
+                % %   hAx_1dprof_hcmenu                                          
+                % %   hAx_2Dprof                                                 
+                % %   hAx_2dprof_hcmenu                                          
+                % %   hAx_MvsIT                                                  
+                % %   hAx_MvsIT_hcmenu                                           
+                % %   hAx_cnf_hcmenu                                             
+                % %   hAx_cwf                                                    
+                % %   hAx_cwf_hcmenu                                             
+                % %   hAx_dat                                                    
+                % %   hAx_dat_hcmenu                                             
+                % %   hAx_dwf                                                    
+                % %   hAx_dwf_hcmenu                                             
+                % %   hAx_geo                                                    
+                % %   hAx_geo_hcmenu                                             
+                % %   hAx_sensitivity                                            
+                % %   hAx_sns_hcmenu                                             
+                % %   hRand                                                      
+                % %   H.PANELS{P.tab_id}.A                                                     
+                % %   H.PANELS{P.tab_id}.B                                                     
+                % %   H.PANELS{P.tab_id}.B                                                     
+                % %   H.PANELS{P.tab_id}.A                                                     
+                % %   H.PANELS{P.tab_id}.A                                                     
+                % %   H.PANELS{P.tab_id}.D                                                     
+                % %   H.PANELS{P.tab_id}.B                                                     
+                % %   H.PANELS{P.tab_id}.A                                                     
+                % %   H.PANELS{P.tab_id}.B                                                     
+                % %   H.PANELS{P.tab_id}.A                                                     
+                % %   H.PANELS{P.tab_id}.B                                                     
+                % %   H.PANELS{P.tab_id}.A                                                     
+                % %   H.PANELS{P.tab_id}.B                                                     
+                % %   H.PANELS{P.tab_id}.A                                                     
+                % %   H.PANELS{P.tab_id}.B                                                     
+                % %   hTabGroup                                                  
+                % %   hTab_1d_viewer                                             
+                % %   hTab_2d_viewer                                             
+                % %   hTab_Confidenc                                             
+                % %   hTab_Inversion                                             
+                % %   H.PANELS{P.tab_id}.B                                             
+                % %   hTab_mod                                                   
+                % %   hTab_mod_cnames                                    
+                % %   hTab_mod_hcmenu                                            
+                % %   h_1d_next                                                  
+                % %   h_1d_prev                                                  
+                % %   h_dscale                                                   
+                % %   h_ex_val                                                   
+                % %   h_fref_val                                                 
+                % %   h_fwd_sw                                                   
+                % %   H.gui                                                      
+                % %   h_hh_val                                                   
+                % %   h_qp_val                                                   
+                % %   h_qp_w                                                     
+                % %   h_qs_val                                                   
+                % %   h_qs_w                                                     
+                % %   h_realtime                                                 
+                % %   h_ro_val                                                   
+                % %   h_ro_w                                                     
+                % %   h_scale_max                                                
+                % %   h_scale_min
+                % %   h_view_rotation       (3D)
+                % %   h_vp_val                                                   
+                % %   h_vp_w                                                     
+                % %   h_vs_val                                                   
+                % %   h_vs_w                                                     
+                % %   hconf_nlevels                                              
+                % %   hconf_nsmooth                                              
+                % %   hconf_xlay                                                 
+                % %   hconf_xprop                                                
+                % %   hconf_ylay                                                 
+                % %   hconf_yprop                                                
+                % %   hsns_bound                                                 
+                % %   hsns_nlevels                                               
+                % %   hsns_step                                                  
+                % %   hsns_xlay                                                  
+                % %   hsns_xprop                                                 
+                if isfield(BIN,'i'); i = BIN.i; end
+                if isfield(BIN,'id'); id = BIN.id; end
+                if isfield(BIN,'independent_optimiazation_cicles'); independent_optimiazation_cicles = BIN.independent_optimiazation_cicles; end
+                if isfield(BIN,'init_single_FDAT'); init_single_FDAT = BIN.init_single_FDAT; end
+                if isfield(BIN,'init_value__dscale'); init_value__dscale = BIN.init_value__dscale; end
+                if isfield(BIN,'init_value__fref'); init_value__fref = BIN.init_value__fref; end
+                if isfield(BIN,'init_value__max_scale'); init_value__max_scale = BIN.init_value__max_scale; end
+                if isfield(BIN,'init_value__min_scale'); init_value__min_scale = BIN.init_value__min_scale; end
+                if isfield(BIN,'ixmax_id'); ixmax_id = BIN.ixmax_id; end
+                if isfield(BIN,'ixmin_id'); ixmin_id = BIN.ixmin_id; end
+                if isfield(BIN,'last_FDAT'); last_FDAT = BIN.last_FDAT; end
+                if isfield(BIN,'last_MDLS'); last_MDLS = BIN.last_MDLS; end
+                if isfield(BIN,'last_log_number'); last_log_number = BIN.last_log_number; end
+                if isfield(BIN,'last_project_name'); last_project_name = BIN.last_project_name; end
+                if isfield(BIN,'last_single_FDAT'); last_single_FDAT = BIN.last_single_FDAT; end
+                if isfield(BIN,'last_single_MDL'); last_single_MDL = BIN.last_single_MDL; end
+                if isfield(BIN,'lsmooth'); lsmooth = BIN.lsmooth; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'main_b'); main_b = BIN.main_b; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'main_h'); main_h = BIN.main_h; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'main_l'); main_l = BIN.main_l; end
+                if isfield(BIN,'main_scale'); main_scale = BIN.main_scale; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'main_w'); main_w = BIN.main_w; end
+                if isfield(BIN,'max_H'); max_H = BIN.max_H; end
+                if isfield(BIN,'max_lat_dH'); max_lat_dH = BIN.max_lat_dH; end
+                if isfield(BIN,'max_lat_dQp'); max_lat_dQp = BIN.max_lat_dQp; end
+                if isfield(BIN,'max_lat_dQs'); max_lat_dQs = BIN.max_lat_dQs; end
+                if isfield(BIN,'max_lat_dRo'); max_lat_dRo = BIN.max_lat_dRo; end
+                if isfield(BIN,'max_lat_dVp'); max_lat_dVp = BIN.max_lat_dVp; end
+                if isfield(BIN,'max_lat_dVs'); max_lat_dVs = BIN.max_lat_dVs; end
+                if isfield(BIN,'max_qp_qs_ratio'); max_qp_qs_ratio = BIN.max_qp_qs_ratio; end
+                if isfield(BIN,'max_qs'); max_qs = BIN.max_qs; end
+                if isfield(BIN,'max_ro'); max_ro = BIN.max_ro; end
+                if isfield(BIN,'max_vp_vs_ratio'); max_vp_vs_ratio = BIN.max_vp_vs_ratio; end
+                if isfield(BIN,'min_H'); min_H = BIN.min_H; end
+                if isfield(BIN,'min_qp_qs_ratio'); min_qp_qs_ratio = BIN.min_qp_qs_ratio; end
+                if isfield(BIN,'min_qs'); min_qs = BIN.min_qs; end
+                if isfield(BIN,'min_ro'); min_ro = BIN.min_ro; end
+                if isfield(BIN,'min_vp_vs_ratio'); min_vp_vs_ratio = BIN.min_vp_vs_ratio; end
+                if isfield(BIN,'min_vs'); min_vs = BIN.min_vs; end
+                if isfield(BIN,'misfit_over_sumweight'); misfit_over_sumweight = BIN.misfit_over_sumweight; end
+                if isfield(BIN,'modl_FDAT'); modl_FDAT = BIN.modl_FDAT; end
+                if isfield(BIN,'modl_FDATSW'); modl_FDATSW = BIN.modl_FDATSW; end
+                if isfield(BIN,'n'); n = BIN.n; end
+                if isfield(BIN,'n_depth_levels'); n_depth_levels = BIN.n_depth_levels; end
+                if isfield(BIN,'ndegfree'); ndegfree = BIN.ndegfree; end
+                if isfield(BIN,'nlaya'); nlaya = BIN.nlaya; end
+                if isfield(BIN,'nlayb'); nlayb = BIN.nlayb; end
+                if isfield(BIN,'nlvl'); nlvl = BIN.nlvl; end
+                if isfield(BIN,'nx_ticks'); nx_ticks = BIN.nx_ticks; end
+                if isfield(BIN,'ny_ticks'); ny_ticks = BIN.ny_ticks; end
+                if isfield(BIN,'nz_ticks'); nz_ticks = BIN.nz_ticks; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'objh'); objh = BIN.objh; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'objn'); objn = BIN.objn; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'objw'); objw = BIN.objw; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'objx'); objx = BIN.objx; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'objy'); objy = BIN.objy; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'pos_axes'); pos_axes = BIN.pos_axes; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'pos_axes2'); pos_axes2 = BIN.pos_axes2; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'pos_axis'); pos_axis = BIN.pos_axis; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'pos_panel'); pos_panel = BIN.pos_panel; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'pos_table'); pos_table = BIN.pos_table; end
+                if isfield(BIN,'poten'); poten = BIN.poten; end
+                if isfield(BIN,'prev_BEST_SINGLE_MISFIT'); prev_BEST_SINGLE_MISFIT = BIN.prev_BEST_SINGLE_MISFIT; end
+                if isfield(BIN,'prev_BEST_SINGLE_MODELS'); prev_BEST_SINGLE_MODELS = BIN.prev_BEST_SINGLE_MODELS; end
+                if isfield(BIN,'prev_MDLS'); prev_MDLS = BIN.prev_MDLS; end
+                if isfield(BIN,'prev_best_FDAT'); prev_best_FDAT = BIN.prev_best_FDAT; end
+                if isfield(BIN,'prev_single_it'); prev_single_it = BIN.prev_single_it; end
+                % SEE COMPATIBILITY PATCH 4.0.0:  if isfield(BIN,'profile_ids');  profile_ids = BIN.profile_ids; end% (3D)                                                        
+                % SEE COMPATIBILITY PATCH 4.0.0:  if isfield(BIN,'profile_line'); profile_line= BIN.profile_line; end% (3D) 
+                if isfield(BIN,'property_1d_to_show'); property_1d_to_show = BIN.property_1d_to_show; end
+                if isfield(BIN,'property_23d_to_show'); property_23d_to_show = BIN.property_23d_to_show; end% (3D)
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'r_distance_from_profile')  r_distance_from_profile= BIN.r_distance_from_profile; end % (3D)
+                if isfield(BIN,'r_reciprocicity');         r_reciprocicity= BIN.r_reciprocicity; end % (3D)
+                if isfield(BIN,'receiver_locations');      receiver_locations= BIN.receiver_locations; end % (3D)
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'row'); row = BIN.row; end
+                if isfield(BIN,'sensitivity_colormap'); sensitivity_colormap = BIN.sensitivity_colormap; end
+                if isfield(BIN,'smoothing_radius'); smoothing_radius = BIN.smoothing_radius; end
+                if isfield(BIN,'smoothing_strategy'); smoothing_strategy = BIN.smoothing_strategy; end
+                if isfield(BIN,'sns_1d_to_show'); sns_1d_to_show = BIN.sns_1d_to_show; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'str'); str = BIN.str; end
+                if isfield(BIN,'sw_nmodes'); sw_nmodes = BIN.sw_nmodes; end
+                if isfield(BIN,'sw_nsmooth'); sw_nsmooth = BIN.sw_nsmooth; end
+                if isfield(BIN,'vala'); vala = BIN.vala; end
+                if isfield(BIN,'valb'); valb = BIN.valb; end
+                if isfield(BIN,'var1'); var1 = BIN.var1; end
+                if isfield(BIN,'var2'); var2 = BIN.var2; end
+                if isfield(BIN,'version'); version = BIN.version; end
+                if isfield(BIN,'vfst_MDLS'); vfst_MDLS = BIN.vfst_MDLS; end
+                if isfield(BIN,'view_max_scale'); view_max_scale = BIN.view_max_scale; end
+                if isfield(BIN,'view_min_scale'); view_min_scale = BIN.view_min_scale; end
+                if isfield(BIN,'viewerview');     viewerview = BIN.viewerview; end  %(3D)
+                if isfield(BIN,'weight_curv');    weight_curv = BIN.weight_curv; end
+                if isfield(BIN,'weight_dpth');    weight_dpth = BIN.weight_dpth; end
+                if isfield(BIN,'working_folder'); working_folder = BIN.working_folder; end
+                if isfield(BIN,'x'); x = BIN.x; end
+                if isfield(BIN,'xpositions'); xpositions = BIN.xpositions; end
+                if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
+                %
+                %% Compatibility Patch 3.0.0
+                inversion_is_started__inedipendent= 'NA';% From version 3.0.0
+                inversion_is_started__global      = 'NA';% From version 3.0.0
+                %
+                %% Compatibility Patch 4.0.0
+                if isfield(BIN,'profile_ids')  
+                    if ~isempty(BIN.profile_ids)
+                        P.profile_ids = cell(1); P.profile_ids{1,1}=BIN.profile_ids;
+                        if isfield(BIN,'profile_line')
+                            P.profile_line = cell(1); P.profile_line{1,1}=BIN.profile_line;
+                        end
+                        P.profile_name  = cell(1); P.profile_name{1,1} ='none';
+                        temp_onoff = zeros( size(SURVEYS,1) ,1);
+                        temp_onoff(P.profile_ids{1,1}(:,1)) = 1;
+                        P.profile_onoff = cell(1); P.profile_onoff{1,1}=temp_onoff;
+                    end
+                end
+            end% load version 1 (first pubblication)
+            %% Data archive version II:(from version 4.0.0) 
+            if  isfield(BIN,'OpenHVSR_elaboration_file_version') && (BIN.OpenHVSR_elaboration_file_version==2)
+                fprintf('Loading archive version-II: (Up to V4.0.0)\n')
+                
+                %% if isfield(BIN,'');  = BIN.; end
+                if isfield(BIN,'file'); file = BIN.file; end
+                if isfield(BIN,'thispath'); thispath = BIN.thispath; end
+                
+                %   ---- gui_3D ----------------------------------------------------------------------------
+                if isfield(BIN,'BEST_ENERGIES'); BEST_ENERGIES = BIN.BEST_ENERGIES; end
+                if isfield(BIN,'BEST_MISFITS'); BEST_MISFITS = BIN.BEST_MISFITS; end
+                if isfield(BIN,'BEST_MODELS'); BEST_MODELS = BIN.BEST_MODELS; end
+                if isfield(BIN,'BEST_SINGLE_MISFIT'); BEST_SINGLE_MISFIT = BIN.BEST_SINGLE_MISFIT; end
+                if isfield(BIN,'BEST_SINGLE_MODELS'); BEST_SINGLE_MODELS = BIN.BEST_SINGLE_MODELS; end
+                if isfield(BIN,'BREAKS'); BREAKS = BIN.BREAKS; end
+                %
+                if isfield(BIN,'CW'); CW = BIN.CW; end
+                if isfield(BIN,'DISCARDS'); DISCARDS = BIN.DISCARDS; end
+                if isfield(BIN,'DL'); DL = BIN.DL; end
+                if isfield(BIN,'DSP'); DSP = BIN.DSP; end
+                if isfield(BIN,'DW'); DW = BIN.DW; end
+                if isfield(BIN,'FDAT'); FDAT = BIN.FDAT; end
+                if isfield(BIN,'FLAG__PC_features'); FLAG__PC_features = BIN.FLAG__PC_features; end
+                if isfield(BIN,'HQEpicDistance'); HQEpicDistance = BIN.HQEpicDistance; end
+                if isfield(BIN,'HQFocalDepth'); HQFocalDepth = BIN.HQFocalDepth; end
+                if isfield(BIN,'HQMagnitude'); HQMagnitude = BIN.HQMagnitude; end
+                if isfield(BIN,'HQRockRatio'); HQRockRatio = BIN.HQRockRatio; end
+                if isfield(BIN,'HQfreq'); HQfreq = BIN.HQfreq; end
+                if isfield(BIN,'LKT'); LKT = BIN.LKT; end
+                if isfield(BIN,'MDLS'); MDLS = BIN.MDLS; end
+                if isfield(BIN,'MODELS'); MODELS = BIN.MODELS; end
+                if isfield(BIN,'Matlab_Release'); Matlab_Release = BIN.Matlab_Release; end
+                if isfield(BIN,'Misfit_curve_term_w'); Misfit_curve_term_w = BIN.Misfit_curve_term_w; end
+                if isfield(BIN,'Misfit_slope_term_w'); Misfit_slope_term_w = BIN.Misfit_slope_term_w; end
+                if isfield(BIN,'Misfit_vs_Iter'); Misfit_vs_Iter = BIN.Misfit_vs_Iter; end
+                if isfield(BIN,'NresultsToKeep'); NresultsToKeep = BIN.NresultsToKeep; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'Nrowa'); Nrowa = BIN.Nrowa; end
+                if isfield(BIN,'QHspec'); QHspec = BIN.QHspec; end
+                if isfield(BIN,'QPList'); QPList = BIN.QPList; end % (3D)
+                if isfield(BIN,'QSList'); QSList = BIN.QSList; end % (3D)
+                if isfield(BIN,'RCT'); RCT = BIN.RCT; end
+                if isfield(BIN,'REFERENCE_MODEL_dH'); REFERENCE_MODEL_dH = BIN.REFERENCE_MODEL_dH; end
+                if isfield(BIN,'REFERENCE_MODEL_zpoints'); REFERENCE_MODEL_zpoints = BIN.REFERENCE_MODEL_zpoints; end
+                if isfield(BIN,'ROList'); ROList = BIN.ROList; end
+                if isfield(BIN,'S'); S = BIN.S; end
+                if isfield(BIN,'SN_centralval'); SN_centralval = BIN.SN_centralval; end
+                if isfield(BIN,'SN_dtamsf'); SN_dtamsf = BIN.SN_dtamsf; end
+                if isfield(BIN,'SN_parname'); SN_parname = BIN.SN_parname; end
+                if isfield(BIN,'SN_parscale'); SN_parscale = BIN.SN_parscale; end
+                if isfield(BIN,'SN_xscale'); SN_xscale = BIN.SN_xscale; end
+                if isfield(BIN,'STORED_1d_daf_fits'); STORED_1d_daf_fits = BIN.STORED_1d_daf_fits; end
+                if isfield(BIN,'STORED_1d_hh_fits'); STORED_1d_hh_fits = BIN.STORED_1d_hh_fits; end
+                if isfield(BIN,'STORED_1d_qp_fits'); STORED_1d_qp_fits = BIN.STORED_1d_qp_fits; end
+                if isfield(BIN,'STORED_1d_qs_fits'); STORED_1d_qs_fits = BIN.STORED_1d_qs_fits; end
+                if isfield(BIN,'STORED_1d_ro_fits'); STORED_1d_ro_fits = BIN.STORED_1d_ro_fits; end
+                if isfield(BIN,'STORED_1d_vp_fits'); STORED_1d_vp_fits = BIN.STORED_1d_vp_fits; end
+                if isfield(BIN,'STORED_1d_vs_fits'); STORED_1d_vs_fits = BIN.STORED_1d_vs_fits; end
+                if isfield(BIN,'STORED_2d_daf_fits'); STORED_2d_daf_fits = BIN.STORED_2d_daf_fits; end
+                if isfield(BIN,'STORED_2d_hh_fits'); STORED_2d_hh_fits = BIN.STORED_2d_hh_fits; end
+                if isfield(BIN,'STORED_2d_qp_fits'); STORED_2d_qp_fits = BIN.STORED_2d_qp_fits; end
+                if isfield(BIN,'STORED_2d_qs_fits'); STORED_2d_qs_fits = BIN.STORED_2d_qs_fits; end
+                if isfield(BIN,'STORED_2d_ro_fits'); STORED_2d_ro_fits = BIN.STORED_2d_ro_fits; end
+                if isfield(BIN,'STORED_2d_vp_fits'); STORED_2d_vp_fits = BIN.STORED_2d_vp_fits; end
+                if isfield(BIN,'STORED_2d_vs_fits'); STORED_2d_vs_fits = BIN.STORED_2d_vs_fits; end
+                if isfield(BIN,'STORED_RESULTS_1d_misfit'); STORED_RESULTS_1d_misfit = BIN.STORED_RESULTS_1d_misfit; end
+                if isfield(BIN,'STORED_RESULTS_2d_misfit'); STORED_RESULTS_2d_misfit = BIN.STORED_RESULTS_2d_misfit; end
+                if isfield(BIN,'STORED_RESULTS_2d_misfit_profile'); STORED_RESULTS_2d_misfit_profile = BIN.STORED_RESULTS_2d_misfit_profile; end
+                if isfield(BIN,'SURVEYS'); SURVEYS = BIN.SURVEYS; end
+                % NO Slider0     (3D)                                                       
+                % NO Slider0b    (3D)                                                           
+                % NO Slider1     (3D)                                                            
+                % NO Slider1b    (3D)                                                           
+                % NO Slider2     (3D)                                                            
+                % NO Slider2b    (3D)
+                % NO  if isfield(BIN,'T2_P1_global_it_count'); T2_P1_global_it_count = BIN.T2_P1_global_it_count; end
+                % NO  if isfield(BIN,'T2_P1_max_it'); T2_P1_max_it = BIN.T2_P1_max_it; end
+                % NO  if isfield(BIN,'T3_P1_inv'); T3_P1_inv = BIN.T3_P1_inv; end
+                % NO  if isfield(BIN,'T3_P1_invSW'); T3_P1_invSW = BIN.T3_P1_invSW; end
+                % NO  if isfield(BIN,'T3_P1_it_count'); T3_P1_it_count = BIN.T3_P1_it_count; end
+                % NO  if isfield(BIN,'T3_P1_max_it'); T3_P1_max_it = BIN.T3_P1_max_it; end
+                % NO  if isfield(BIN,'T3_P1_txt'); T3_P1_txt = BIN.T3_P1_txt; end
+                % NO  if isfield(BIN,'T3_p1_revert'); T3_p1_revert = BIN.T3_p1_revert; end
+                % NO  if isfield(BIN,'T5_P1_HsMask'); T5_P1_HsMask = BIN.T5_P1_HsMask; end
+                % NO  if isfield(BIN,'T5_P1_txtx'); T5_P1_txtx = BIN.T5_P1_txtx; end
+                % NO  if isfield(BIN,'T5_P1_txty'); T5_P1_txty = BIN.T5_P1_txty; end
+                % NO  if isfield(BIN,'T6_P1_txtx'); T6_P1_txtx = BIN.T6_P1_txtx; end
+                if isfield(BIN,'TO_INVERT'); TO_INVERT = BIN.TO_INVERT; end
+                if isfield(BIN,'VPList'); VPList = BIN.VPList; end % (3D)
+                if isfield(BIN,'VSList'); VSList = BIN.VSList; end % (3D)
+                if isfield(BIN,'X1'); X1 = BIN.X1; end
+                if isfield(BIN,'X2'); X2 = BIN.X2; end
+                if isfield(BIN,'ZZList'); ZZList = BIN.ZZList; end % (3D)
+                % NO  if isfield(BIN,'ans'); ans = BIN.ans; end
+                if isfield(BIN,'appname'); appname = BIN.appname; end
+                if isfield(BIN,'basevalue'); basevalue = BIN.basevalue; end
+                if isfield(BIN,'basevaluew'); basevaluew = BIN.basevaluew; end
+                if isfield(BIN,'bedrock'); bedrock = BIN.bedrock; end
+                if isfield(BIN,'best_FDAT'); best_FDAT = BIN.best_FDAT; end
+                %190404 if isfield(BIN,'beta_stuff_enable_status'); beta_stuff_enable_status = BIN.beta_stuff_enable_status; end
+                if isfield(BIN,'P.ExtraFeatures.beta_stuff_enable_status'); P.ExtraFeatures.beta_stuff_enable_status = BIN.P.ExtraFeatures.beta_stuff_enable_status; end
+                %  (2D)
+                if isfield(BIN,'conf_1d_to_show_x'); conf_1d_to_show_x = BIN.conf_1d_to_show_x; end
+                if isfield(BIN,'conf_1d_to_show_y'); conf_1d_to_show_y = BIN.conf_1d_to_show_y; end
+                if isfield(BIN,'confidence_colormap'); confidence_colormap = BIN.confidence_colormap; end
+                if isfield(BIN,'curve_plotmode'); curve_plotmode = BIN.curve_plotmode; end
+                if isfield(BIN,'curve_weights_plotmode'); curve_weights_plotmode = BIN.curve_weights_plotmode; end
+                %% FIX if isfield(BIN,'P.isshown.id'); P.isshown.id = BIN.P.isshown.id; end
+                %190404 if isfield(BIN,'data_1d_to_show'); data_1d_to_show = BIN.data_1d_to_show; end
+                %    cutplanes (load no need)
+                if isfield(BIN,'datafile_columns'); datafile_columns = BIN.datafile_columns; end
+                if isfield(BIN,'datafile_separator'); datafile_separator = BIN.datafile_separator; end
+                if isfield(BIN,'default_colormap'); default_colormap = BIN.default_colormap; end
+                if isfield(BIN,'depth_weights_plotmode'); depth_weights_plotmode = BIN.depth_weights_plotmode; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'dh'); dh = BIN.dh; end
+                if isfield(BIN,'dim'); dim = BIN.dim; end % (3D)
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'dw'); dw = BIN.dw; end
+                if isfield(BIN,'dx'); dx = BIN.dx; end
+                % NO  if isfield(BIN,'eh52'); eh52 = BIN.eh52; end
+                % NO  if isfield(BIN,'eh52_childs'); eh52_childs = BIN.eh52_childs; end
+                % 180323  if isfield(BIN,'enable_menu'); enable_menu = BIN.enable_menu; end
+                % 180323  if isfield(BIN,'fontsizeis'); fontsizeis = BIN.fontsizeis; end
+                if isfield(BIN,'gapx'); gapx = BIN.gapx; end
+                if isfield(BIN,'global_inversion_step'); global_inversion_step = BIN.global_inversion_step; end
+                % %   h0                                                         
+                % %   h1                                                         
+                % %   h10                                                        
+                % %   h5                                                         
+                % %   h51                                                        
+                % %   h52                                                        
+                % %   h5_1                                                       
+                % %   h7                                                         
+                % %   hAx_1d_confidence                                          
+                % %   hAx_1dprof                                                 
+                % %   hAx_1dprof_hcmenu                                          
+                % %   hAx_2Dprof                                                 
+                % %   hAx_2dprof_hcmenu                                          
+                % %   hAx_MvsIT                                                  
+                % %   hAx_MvsIT_hcmenu                                           
+                % %   hAx_cnf_hcmenu                                             
+                % %   hAx_cwf                                                    
+                % %   hAx_cwf_hcmenu                                             
+                % %   hAx_dat                                                    
+                % %   hAx_dat_hcmenu                                             
+                % %   hAx_dwf                                                    
+                % %   hAx_dwf_hcmenu                                             
+                % %   hAx_geo                                                    
+                % %   hAx_geo_hcmenu                                             
+                % %   hAx_sensitivity                                            
+                % %   hAx_sns_hcmenu                                             
+                % %   hRand                                                      
+                % %   H.PANELS{P.tab_id}.A                                                     
+                % %   H.PANELS{P.tab_id}.B                                                     
+                % %   H.PANELS{P.tab_id}.B                                                     
+                % %   H.PANELS{P.tab_id}.A                                                     
+                % %   H.PANELS{P.tab_id}.A                                                     
+                % %   H.PANELS{P.tab_id}.D                                                     
+                % %   H.PANELS{P.tab_id}.B                                                     
+                % %   H.PANELS{P.tab_id}.A                                                     
+                % %   H.PANELS{P.tab_id}.B                                                     
+                % %   H.PANELS{P.tab_id}.A                                                     
+                % %   H.PANELS{P.tab_id}.B                                                     
+                % %   H.PANELS{P.tab_id}.A                                                     
+                % %   H.PANELS{P.tab_id}.B                                                     
+                % %   H.PANELS{P.tab_id}.A                                                     
+                % %   H.PANELS{P.tab_id}.B                                                     
+                % %   hTabGroup                                                  
+                % %   hTab_1d_viewer                                             
+                % %   hTab_2d_viewer                                             
+                % %   hTab_Confidenc                                             
+                % %   hTab_Inversion                                             
+                % %   H.PANELS{P.tab_id}.B                                             
+                % %   hTab_mod                                                   
+                % %   hTab_mod_cnames                                    
+                % %   hTab_mod_hcmenu                                            
+                % %   h_1d_next                                                  
+                % %   h_1d_prev                                                  
+                % %   h_dscale                                                   
+                % %   h_ex_val                                                   
+                % %   h_fref_val                                                 
+                % %   h_fwd_sw                                                   
+                % %   H.gui                                                      
+                % %   h_hh_val                                                   
+                % %   h_qp_val                                                   
+                % %   h_qp_w                                                     
+                % %   h_qs_val                                                   
+                % %   h_qs_w                                                     
+                % %   h_realtime                                                 
+                % %   h_ro_val                                                   
+                % %   h_ro_w                                                     
+                % %   h_scale_max                                                
+                % %   h_scale_min
+                % %   h_view_rotation       (3D)
+                % %   h_vp_val                                                   
+                % %   h_vp_w                                                     
+                % %   h_vs_val                                                   
+                % %   h_vs_w                                                     
+                % %   hconf_nlevels                                              
+                % %   hconf_nsmooth                                              
+                % %   hconf_xlay                                                 
+                % %   hconf_xprop                                                
+                % %   hconf_ylay                                                 
+                % %   hconf_yprop                                                
+                % %   hsns_bound                                                 
+                % %   hsns_nlevels                                               
+                % %   hsns_step                                                  
+                % %   hsns_xlay                                                  
+                % %   hsns_xprop                                                 
+                if isfield(BIN,'i'); i = BIN.i; end
+                if isfield(BIN,'id'); id = BIN.id; end
+                if isfield(BIN,'independent_optimiazation_cicles'); independent_optimiazation_cicles = BIN.independent_optimiazation_cicles; end
+                if isfield(BIN,'init_single_FDAT'); init_single_FDAT = BIN.init_single_FDAT; end
+                if isfield(BIN,'init_value__dscale'); init_value__dscale = BIN.init_value__dscale; end
+                if isfield(BIN,'init_value__fref'); init_value__fref = BIN.init_value__fref; end
+                if isfield(BIN,'init_value__max_scale'); init_value__max_scale = BIN.init_value__max_scale; end
+                if isfield(BIN,'init_value__min_scale'); init_value__min_scale = BIN.init_value__min_scale; end
+                if isfield(BIN,'ixmax_id'); ixmax_id = BIN.ixmax_id; end
+                if isfield(BIN,'ixmin_id'); ixmin_id = BIN.ixmin_id; end
+                if isfield(BIN,'last_FDAT'); last_FDAT = BIN.last_FDAT; end
+                if isfield(BIN,'last_MDLS'); last_MDLS = BIN.last_MDLS; end
+                if isfield(BIN,'last_log_number'); last_log_number = BIN.last_log_number; end
+                if isfield(BIN,'last_project_name'); last_project_name = BIN.last_project_name; end
+                if isfield(BIN,'last_single_FDAT'); last_single_FDAT = BIN.last_single_FDAT; end
+                if isfield(BIN,'last_single_MDL'); last_single_MDL = BIN.last_single_MDL; end
+                if isfield(BIN,'lsmooth'); lsmooth = BIN.lsmooth; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'main_b'); main_b = BIN.main_b; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'main_h'); main_h = BIN.main_h; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'main_l'); main_l = BIN.main_l; end
+                if isfield(BIN,'main_scale'); main_scale = BIN.main_scale; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'main_w'); main_w = BIN.main_w; end
+                if isfield(BIN,'max_H'); max_H = BIN.max_H; end
+                if isfield(BIN,'max_lat_dH'); max_lat_dH = BIN.max_lat_dH; end
+                if isfield(BIN,'max_lat_dQp'); max_lat_dQp = BIN.max_lat_dQp; end
+                if isfield(BIN,'max_lat_dQs'); max_lat_dQs = BIN.max_lat_dQs; end
+                if isfield(BIN,'max_lat_dRo'); max_lat_dRo = BIN.max_lat_dRo; end
+                if isfield(BIN,'max_lat_dVp'); max_lat_dVp = BIN.max_lat_dVp; end
+                if isfield(BIN,'max_lat_dVs'); max_lat_dVs = BIN.max_lat_dVs; end
+                if isfield(BIN,'max_qp_qs_ratio'); max_qp_qs_ratio = BIN.max_qp_qs_ratio; end
+                if isfield(BIN,'max_qs'); max_qs = BIN.max_qs; end
+                if isfield(BIN,'max_ro'); max_ro = BIN.max_ro; end
+                if isfield(BIN,'max_vp_vs_ratio'); max_vp_vs_ratio = BIN.max_vp_vs_ratio; end
+                if isfield(BIN,'min_H'); min_H = BIN.min_H; end
+                if isfield(BIN,'min_qp_qs_ratio'); min_qp_qs_ratio = BIN.min_qp_qs_ratio; end
+                if isfield(BIN,'min_qs'); min_qs = BIN.min_qs; end
+                if isfield(BIN,'min_ro'); min_ro = BIN.min_ro; end
+                if isfield(BIN,'min_vp_vs_ratio'); min_vp_vs_ratio = BIN.min_vp_vs_ratio; end
+                if isfield(BIN,'min_vs'); min_vs = BIN.min_vs; end
+                if isfield(BIN,'misfit_over_sumweight'); misfit_over_sumweight = BIN.misfit_over_sumweight; end
+                if isfield(BIN,'modl_FDAT'); modl_FDAT = BIN.modl_FDAT; end
+                if isfield(BIN,'modl_FDATSW'); modl_FDATSW = BIN.modl_FDATSW; end
+                if isfield(BIN,'n'); n = BIN.n; end
+                if isfield(BIN,'n_depth_levels'); n_depth_levels = BIN.n_depth_levels; end
+                if isfield(BIN,'ndegfree'); ndegfree = BIN.ndegfree; end
+                if isfield(BIN,'nlaya'); nlaya = BIN.nlaya; end
+                if isfield(BIN,'nlayb'); nlayb = BIN.nlayb; end
+                if isfield(BIN,'nlvl'); nlvl = BIN.nlvl; end
+                if isfield(BIN,'nx_ticks'); nx_ticks = BIN.nx_ticks; end
+                if isfield(BIN,'ny_ticks'); ny_ticks = BIN.ny_ticks; end
+                if isfield(BIN,'nz_ticks'); nz_ticks = BIN.nz_ticks; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'objh'); objh = BIN.objh; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'objn'); objn = BIN.objn; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'objw'); objw = BIN.objw; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'objx'); objx = BIN.objx; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'objy'); objy = BIN.objy; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'pos_axes'); pos_axes = BIN.pos_axes; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'pos_axes2'); pos_axes2 = BIN.pos_axes2; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'pos_axis'); pos_axis = BIN.pos_axis; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'pos_panel'); pos_panel = BIN.pos_panel; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'pos_table'); pos_table = BIN.pos_table; end
+                if isfield(BIN,'poten'); poten = BIN.poten; end
+                if isfield(BIN,'prev_BEST_SINGLE_MISFIT'); prev_BEST_SINGLE_MISFIT = BIN.prev_BEST_SINGLE_MISFIT; end
+                if isfield(BIN,'prev_BEST_SINGLE_MODELS'); prev_BEST_SINGLE_MODELS = BIN.prev_BEST_SINGLE_MODELS; end
+                if isfield(BIN,'prev_MDLS'); prev_MDLS = BIN.prev_MDLS; end
+                if isfield(BIN,'prev_best_FDAT'); prev_best_FDAT = BIN.prev_best_FDAT; end
+                if isfield(BIN,'prev_single_it'); prev_single_it = BIN.prev_single_it; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'profile_ids');  profile_ids = BIN.profile_ids; end% (3D)                                                        
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'profile_line'); profile_line= BIN.profile_line; end% (3D) 
+                if isfield(BIN,'property_1d_to_show'); property_1d_to_show = BIN.property_1d_to_show; end
+                if isfield(BIN,'property_23d_to_show'); property_23d_to_show = BIN.property_23d_to_show; end% (3D)
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'r_distance_from_profile')  r_distance_from_profile= BIN.r_distance_from_profile; end % (3D)
+                if isfield(BIN,'r_reciprocicity');          r_reciprocicity= BIN.r_reciprocicity; end % (3D)
+                if isfield(BIN,'receiver_locations');       receiver_locations= BIN.receiver_locations; end % (3D)
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'row'); row = BIN.row; end
+                if isfield(BIN,'sensitivity_colormap'); sensitivity_colormap = BIN.sensitivity_colormap; end
+                if isfield(BIN,'smoothing_radius'); smoothing_radius = BIN.smoothing_radius; end
+                if isfield(BIN,'smoothing_strategy'); smoothing_strategy = BIN.smoothing_strategy; end
+                if isfield(BIN,'sns_1d_to_show'); sns_1d_to_show = BIN.sns_1d_to_show; end
+                % NOT NEDEED 4.0.0:  if isfield(BIN,'str'); str = BIN.str; end
+                if isfield(BIN,'sw_nmodes'); sw_nmodes = BIN.sw_nmodes; end
+                if isfield(BIN,'sw_nsmooth'); sw_nsmooth = BIN.sw_nsmooth; end
+                if isfield(BIN,'vala'); vala = BIN.vala; end
+                if isfield(BIN,'valb'); valb = BIN.valb; end
+                if isfield(BIN,'var1'); var1 = BIN.var1; end
+                if isfield(BIN,'var2'); var2 = BIN.var2; end
+                if isfield(BIN,'version'); version = BIN.version; end
+                if isfield(BIN,'vfst_MDLS'); vfst_MDLS = BIN.vfst_MDLS; end
+                if isfield(BIN,'view_max_scale'); view_max_scale = BIN.view_max_scale; end
+                if isfield(BIN,'view_min_scale'); view_min_scale = BIN.view_min_scale; end
+                if isfield(BIN,'viewerview');     viewerview = BIN.viewerview; end  %(3D)
+                if isfield(BIN,'weight_curv');    weight_curv = BIN.weight_curv; end
+                if isfield(BIN,'weight_dpth');    weight_dpth = BIN.weight_dpth; end
+                if isfield(BIN,'working_folder'); working_folder = BIN.working_folder; end
+                if isfield(BIN,'x'); x = BIN.x; end
+                if isfield(BIN,'xpositions'); xpositions = BIN.xpositions; end
+                if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
+                %% From 3.0.0
+                if isfield(BIN,'inversion_is_started__inedipendent');  inversion_is_started__inedipendent= BIN.inversion_is_started__inedipendent; end
+                if isfield(BIN,'inversion_is_started__global');        inversion_is_started__global      = BIN.inversion_is_started__global; end
+                %% From 4.0.0
+                if isfield(BIN,'P');  P= BIN.P; end
+            end% load version 2 (from 4.0.0)
             
-            %% graphicks
+            %% Update Interface  if isfield(BIN,'');  = BIN.; end
+            if isfield(BIN,'ui_dist');   set(hRand,    'Value',    BIN.ui_dist);   end
+            if isfield(BIN,'ui_hh_pc');  set(h_hh_val, 'String',   BIN.ui_hh_pc);   end
+
+            if isfield(BIN,'ui_vp_pc');  set(h_vp_val, 'String',   BIN.ui_vp_pc);   end
+            if isfield(BIN,'ui_vp_ww');  set(h_vp_w,   'String',   BIN.ui_vp_ww);   end
+
+            if isfield(BIN,'ui_vs_pc');  set(h_vs_val, 'String',   BIN.ui_vs_pc);   end
+            if isfield(BIN,'ui_vs_ww');  set(h_vs_w,   'String',   BIN.ui_vs_ww);   end
+
+            if isfield(BIN,'ui_ro_pc');  set(h_ro_val, 'String',   BIN.ui_ro_pc);   end
+            if isfield(BIN,'ui_ro_ww');  set(h_ro_w,   'String',   BIN.ui_ro_ww);   end
+
+            if isfield(BIN,'ui_qp_pc');  set(h_qp_val, 'String',   BIN.ui_qp_pc);   end
+            if isfield(BIN,'ui_qp_ww');  set(h_qp_w,   'String',   BIN.ui_qp_ww);   end
+
+            if isfield(BIN,'ui_qs_pc');  set(h_qs_val, 'String',   BIN.ui_qs_pc);   end
+            if isfield(BIN,'ui_qs_ww');  set(h_qs_w,   'String',   BIN.ui_qs_ww);   end
+
+            if isfield(BIN,'ui_ex');     set(h_ex_val,   'String',   BIN.ui_ex);   end
+            if isfield(BIN,'ui_fref');   set(h_fref_val, 'String',   BIN.ui_fref);   end
+            if isfield(BIN,'ui_frnge_1');  set(h_scale_min,'String',   BIN.ui_frnge_1);   end
+            if isfield(BIN,'ui_frnge_2');  set(h_scale_max,'String',   BIN.ui_frnge_2);   end
+            if isfield(BIN,'ui_frnge_d');  set(h_dscale,   'String',   BIN.ui_frnge_d);   end
+            
+            fprintf('[Elaboration resumed Correctly]\n')
+            P.isshown.id = 1;
+            %% graphics
             plot__curve_weights(hAx_cwf);
             plot__depth_weights();
             Show_survey(hAx_dat);
             %
-            fprintf('[Elaboration resumed Correctly]\n')
+            Update_survey_locations(hAx_main_geo);
+            Update_survey_locations(hAx_geo);
         end
     end
 %%      Settings
@@ -2399,44 +2990,44 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 %%          smoothing
     function Menu_smoothing_strategy0_Callback(~,~,~)
         smoothing_strategy = 0; spunta(eh52_childs, smoothing_strategy);
-        plot_2d_profile( h_gui,  hAx_2Dprof,property_23d_to_show);
+        plot_2d_profile( H.gui,  hAx_2Dprof,property_23d_to_show);
     end
     function Menu_smoothing_strategy1_Callback(~,~,~)
         smoothing_strategy = 1; 
         set_smoothing_radius();
         spunta(eh52_childs, smoothing_strategy);% disable_components();
-        plot_2d_profile( h_gui,  hAx_2Dprof,property_23d_to_show);
+        plot_2d_profile( H.gui,  hAx_2Dprof,property_23d_to_show);
     end
     function Menu_smoothing_strategy2_Callback(~,~,~)
         smoothing_strategy = 2; 
         set_smoothing_radius();
         spunta(eh52_childs, smoothing_strategy);% disable_components();
-        plot_2d_profile( h_gui,  hAx_2Dprof,property_23d_to_show);
+        plot_2d_profile( H.gui,  hAx_2Dprof,property_23d_to_show);
     end
     function Menu_smoothing_strategy3_Callback(~,~,~)
         smoothing_strategy = 3;
         set_smoothing_radius(); 
         spunta(eh52_childs, smoothing_strategy);% disable_components();
-        plot_2d_profile( h_gui,  hAx_2Dprof,property_23d_to_show);
+        plot_2d_profile( H.gui,  hAx_2Dprof,property_23d_to_show);
     end
     function set_smoothing_radius()
         prompt = {'Smoothing Radius (0 = off)'};
         def = {num2str(smoothing_radius)};
         answer = inputdlg(prompt,'Smoothing',1,def);
         smoothing_radius = str2double(answer{1});
-        %plot_2d_profile( h_gui,  hAx_2Dprof,parameter_id)
+        %plot_2d_profile( H.gui,  hAx_2Dprof,parameter_id)
     end
 %%          colormap
     function Menu_view_cmap_Jet(~,~,~)
-        set(h_gui,'CurrentAxes',hAx_2Dprof);
+        set(H.gui,'CurrentAxes',hAx_2Dprof);
         colormap(hAx_2Dprof, 'Jet');
     end
     function Menu_view_cmap_Hot(~,~,~)
-        set(h_gui,'CurrentAxes',hAx_2Dprof);
+        set(H.gui,'CurrentAxes',hAx_2Dprof);
         colormap(hAx_2Dprof, 'Hot');
     end
     function Menu_view_cmap_Bone(~,~,~)
-        set(h_gui,'CurrentAxes',hAx_2Dprof);
+        set(H.gui,'CurrentAxes',hAx_2Dprof);
         colormap(hAx_2Dprof, 'Bone');
     end
     function Menu_View_clim(~,~,~)
@@ -2473,6 +3064,318 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 %%      About
     function Menu_About_Credits(~,~,~)
         msgbox(get(h10,'UserData'),'CREDITS:')   
+    end
+%% TAB-1: ================================================= Main View
+    function CB_hAx_geo_back(~,~,~)
+        Ndat = size(FDAT,1);
+        if(Ndat>0)
+            val = P.isshown.id;
+            switch(P.isshown.id)
+                case 0; val = Ndat; 
+                case 1; val = Ndat;    
+                otherwise; val = val -1;    
+            end
+            P.isshown.id = val;
+            
+            prev_MDLS = MDLS;
+            prev_BEST_SINGLE_MODELS = BEST_SINGLE_MODELS;
+            prev_best_FDAT = best_FDAT;
+            prev_BEST_SINGLE_MISFIT = BEST_SINGLE_MISFIT;
+            prev_single_it = independent_optimiazation_cicles(P.isshown.id);
+
+            last_single_FDAT = cell(1,2); 
+            
+            set(T3_P1_it_count,'String',strcat( num2str(independent_optimiazation_cicles(P.isshown.id)),' so far'));
+            Update_survey_locations(hAx_main_geo);
+            Update_survey_locations(hAx_geo);
+            Show_survey(hAx_dat);
+            %plot_1d_profile(hAx_1dprof);
+            
+            hold(hAx_1dprof,'off');
+            draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
+        end
+    end
+    function CB_hAx_geo_next(~,~,~)
+        Ndat = size(FDAT,1);
+        if(Ndat>0)
+            val = P.isshown.id;
+            switch(P.isshown.id)
+                case 0; val = 1; 
+                case Ndat; val = 1;    
+                otherwise; val = val +1;    
+            end
+            P.isshown.id = val;
+
+            prev_MDLS = MDLS;
+
+            prev_BEST_SINGLE_MODELS = BEST_SINGLE_MODELS;
+            prev_best_FDAT = best_FDAT;
+            prev_BEST_SINGLE_MISFIT = BEST_SINGLE_MISFIT;
+            prev_single_it = independent_optimiazation_cicles(P.isshown.id);
+
+            last_single_FDAT = cell(1,2); 
+
+            set(T3_P1_it_count,'String',strcat( num2str(independent_optimiazation_cicles(P.isshown.id)),' so far'));
+            Update_survey_locations(hAx_main_geo);
+            Update_survey_locations(hAx_geo);
+            Show_survey(hAx_dat);
+            %plot_1d_profile(hAx_1dprof);
+
+            hold(hAx_1dprof,'off');
+            draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
+        end
+    end
+    function CB_hAx_geo_goto(~,~,~)
+        if isempty(SURVEYS); return; end
+        if P.isshown.id ==0; return; end
+        %
+        %
+        Ndat = size(SURVEYS,1);
+        prompt = {'Select Measurement ID'};
+        def = {'0'};
+        answer = inputdlg(prompt,'Unite with next',1,def);
+        if(~isempty(answer))
+            val = str2double(answer{1});
+            if 0<val && val<=Ndat
+                P.isshown.id= val;
+                
+                prev_MDLS = MDLS;
+
+                prev_BEST_SINGLE_MODELS = BEST_SINGLE_MODELS;
+                prev_best_FDAT = best_FDAT;
+                prev_BEST_SINGLE_MISFIT = BEST_SINGLE_MISFIT;
+                prev_single_it = independent_optimiazation_cicles(P.isshown.id);
+
+                last_single_FDAT = cell(1,2); 
+
+                set(T3_P1_it_count,'String',strcat( num2str(independent_optimiazation_cicles(P.isshown.id)),' so far'));
+                Update_survey_locations(hAx_main_geo);
+                Update_survey_locations(hAx_geo);
+                Show_survey(hAx_dat);
+                %plot_1d_profile(hAx_1dprof);
+
+                hold(hAx_1dprof,'off');
+                draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
+                %Update_Inversion_Parameters();
+                %Update_profile_locations(hAx_main_geo);
+            end
+        end
+    end
+    %
+    function CB_hAx_show_profile_back(~,~,~)
+        if ~isempty(P.profile_ids)
+            Ndat = size(P.profile_ids,1);
+            val = P.profile.id;
+            switch(P.profile.id)
+                case 0; val = Ndat;
+                case 1; val = Ndat;
+                otherwise; val = val -1;
+            end
+            P.profile.id = val;
+            Update_profile_locations(hAx_main_geo);
+            Update_survey_locations(hAx_geo);
+        else
+            Message = sprintf('NO PROFILES WERE CREATED\n. \nProfile Creation: (On "Main View" Tab)\n1) Define profiles by right-clicking on the map.\n2) Click to set the profile''s start point.\n3) Click again to set the profile''s end point.\n4) Include stations by indicating the farthest station to be included.\n5) Use add/remove buttons to include/exclude single stations.\n \nProfile Visualization: (on this Tab)\n1) Select a profile to be shown using the [-][->][+] buttons.\n2) Select a the property to be shown using buttons on the rigth.');
+            msgbox(Message,'INFO')
+            return;
+        end
+    end
+    function CB_hAx_show_profile_next(~,~,~)
+        if ~isempty(P.profile_ids)
+            Ndat = size(P.profile_ids,1);
+            val = P.profile.id;
+            switch(P.profile.id)
+                case 0; val = 1;
+                case Ndat; val = 1;
+                otherwise; val = val +1;
+            end
+            P.profile.id = val;
+            Update_profile_locations(hAx_main_geo);
+            Update_survey_locations(hAx_geo);
+        else
+            Message = sprintf('NO PROFILES WERE CREATED\n. \nProfile Creation: (On "Main View" Tab)\n1) Define profiles by right-clicking on the map.\n2) Click to set the profile''s start point.\n3) Click again to set the profile''s end point.\n4) Include stations by indicating the farthest station to be included.\n5) Use add/remove buttons to include/exclude single stations.\n \nProfile Visualization: (on this Tab)\n1) Select a profile to be shown using the [-][->][+] buttons.\n2) Select a the property to be shown using buttons on the rigth.');
+            msgbox(Message,'INFO')
+            return;
+        end
+    end
+    function CB_hAx_show_profile_goto(~,~,~)
+        if ~isempty(P.profile_ids)
+            prompt = {'Select Profile ID'};
+            def = {'0'};
+            answer = inputdlg(prompt,'Unite with next',1,def);
+            if(~isempty(answer))
+                val = str2double(answer{1});
+                Ndat = size(P.profile_ids,1);
+                if 0<val && val<=Ndat
+                    P.profile.id = val;
+                    Update_profile_locations(hAx_main_geo);
+                    Update_survey_locations(hAx_geo);
+                end
+            end
+        else
+            Message = sprintf('NO PROFILES WERE CREATED\n. \nProfile Creation: (On "Main View" Tab)\n1) Define profiles by right-clicking on the map.\n2) Click to set the profile''s start point.\n3) Click again to set the profile''s end point.\n4) Include stations by indicating the farthest station to be included.\n5) Use add/remove buttons to include/exclude single stations.\n \nProfile Visualization: (on this Tab)\n1) Select a profile to be shown using the [-][->][+] buttons.\n2) Select a the property to be shown using buttons on the rigth.');
+            msgbox(Message,'INFO')
+            return;
+        end
+    end
+    
+    %
+    function CB_hAx_profile_addrec(~,~,~)
+        if P.profile.id==0; return; end
+        if ~isempty(P.profile_ids)
+            Ndat = size(SURVEYS,1);
+            prompt = {'Select id'};
+            def = {'0'};
+            answer = inputdlg(prompt,'Add receiver',1,def);
+            ispresent = 0;
+            if(~isempty(answer))
+                val = str2double(answer{1});
+                if 1<=val && val<= Ndat
+                    for ii=1:size(P.profile_ids{P.profile.id,1},1)
+                        if val==P.profile_ids{P.profile.id,1}(ii,1)
+                            ispresent=1;
+                        end
+                    end
+                    if ispresent==0% add the point
+                        additional = [];
+                        xx    = P.profile_line{P.profile.id,1}(:,1);
+                        yy    = P.profile_line{P.profile.id,1}(:,2);
+                        recta_kind = 0;
+                        if(xx(1)==xx(2)) % rect x=constant
+                            recta_kind = 1;
+                            dr = receiver_locations(val,2)-yy(1);
+                            far = abs(receiver_locations(val,1)-xx(1));
+                            additional = [val, dr, far];
+                        end
+                        if(yy(1)==yy(2)) % rect y=constant
+                                recta_kind = 2;
+                                dr = receiver_locations(val,1)-xx(1);
+                                far = abs(receiver_locations(val,2)-yy(1));
+                                additional = [val, dr, far];
+                        end
+                        if(recta_kind==0) % rect y=mx+q    q=y-mx
+                            m1 = (yy(2)-yy(1))/(xx(2)-xx(1));
+                            q1 = yy(1) - m1*xx(1);
+                            dist = abs(receiver_locations(val,2) - (m1*receiver_locations(val,1) +q1))/sqrt(1+m1^2);% Equation 1
+                            %% info
+                            % r1:  y = m1 x + q1 (profile)
+                            % r2:  y = m2 x + q2 (line through the receiver and perpendicular to r1)
+                            %
+                            % rect given endpoints
+                            % r1 = m1 x + q1:    (ax +by +c = 0)
+                            %     a = y2-y1
+                            %     b = x2-x1
+                            %     c = x2 y1 - y2 x1
+                            %     m1 = -a/b = -(y2-y1)/(x2-x1) 
+                            %     q1  = y1 -m1 x1
+                            %
+                            % distance of point p (receiver) from the rect r1 (the profile). (Equation 1)
+                            % dist = |yp - m1 xp -q1 | / sqrt(1 + m1^1)
+                            %
+                            % rect (r2) through a point p and perpendicular to r1 (y=m1 x +q1):
+                            % y = m2 xp + q2
+                            % m2  = -1/m1
+                            % q2 = yp - m2 xp == yp +xp/m1  (Equation 2)
+                            %
+                            % point of intersection of two rects
+                            % [ y = m2 x + q2
+                            % [ y = m1 x + q1
+                            %
+                            % [ y = m2 x + q2
+                            % [ m2 x + q2 = m1 x + q1 -> x(m2-m1) = (q1-q2)
+                            %
+                            % [ y = m2 (q1-q2)/(m2-m1)+ q2
+                            % [ x = (q1-q2)/(m2-m1) 
+                            %%
+                            m2 = -1/m1;
+                            q2 = receiver_locations(val,2) + receiver_locations(val,1)/m1;%  (Equation 2)  
+                            xp = (q1-q2)/(m2-m1);%             Point of intersection
+                            yp = m2*(q1-q2)/(m2-m1)+q2;% Point of intersection 
+                            drs= sqrt( (xx(1)-xp).^2 + (yy(1)-yp).^2 );% distances from beginning of profile
+                            %
+                            far = dist;
+                            dr  = drs;
+                            if(xp < xx)
+                                dr = -dr;
+                            end
+                            % val = station-ID
+                            % dr  = distance (along profile) from profile beginning
+                            % far = distance from profile
+                            additional = [val, dr, far];
+                        end
+                        %
+                        % check for double entries (same longitudinal distance, to be avoided)     
+                        if isempty(additional); return; end
+                        [r,~]= find(P.profile_ids{P.profile.id,1}(:,2)==additional (2));
+                        if ~isempty(r) 
+                            Message = sprintf('COULD NOT ADD STATION TO THE PROFILE\nOnce projected, the selected station overlaps with station no. %d.',P.profile_ids{P.profile.id,1}( r(1), 1)   );
+                            msgbox(Message,'INFO')
+                            return; 
+                        end
+                        % if everything is Ok
+                        P.profile_ids{P.profile.id,1} = [P.profile_ids{P.profile.id,1};  additional];
+                        P.profile_onoff{P.profile.id,1}(val) = 1;
+                        %
+                        dummy = P.profile_ids{P.profile.id,1};
+                        [~,idx] = sort(dummy(:,2)); % sort just the first column
+                        sortedmat = dummy(idx,:);   % sort the whole matrix using the sort indices
+                        P.profile_ids{P.profile.id,1}   = sortedmat;
+                        %
+                        %set(h_shown_prof,'String',['prof. ',num2str(P.profile.id)])
+                    end
+                end
+            end
+            Update_profile_locations(hAx_main_geo);
+            %is_done();
+        else
+            Message = sprintf('NO PROFILES WERE CREATED\n. \nProfile Creation: (On "Main" Tab)\n1) Define profiles by right-clicking on the map.\n2) Click to set the profile''s start point.\n3) Click again to set the profile''s end point.\n4) Include stations by entering the desired distance from profile.\n5) Use add/remove buttons to include/exclude single stations.\n \nProfile Visualization: (on this Tab)\n1) Select a profile to be shown using the [-][->][+] buttons.\n2) Select a the property to be shown using buttons on the rigth.');
+            msgbox(Message,'INFO')
+            return;
+        end
+    end
+    function CB_hAx_profile_remrec(~,~,~)
+        if P.profile.id==0; return; end
+        if ~isempty(P.profile_ids)
+            Ndat = size(SURVEYS,1);
+            prompt = {'Select id'};
+            def = {'0'};
+            answer = inputdlg(prompt,'Remove receiver',1,def);
+            Nr = size(P.profile_ids{P.profile.id,1},1);
+            Nn = 0;
+            if(~isempty(answer))
+                val = str2double(answer{1});
+                if 1<=val && val<= Ndat
+                    dummy_ids = 0*P.profile_ids{P.profile.id,1};
+                    for ii = 1:Nr
+                        if val~=P.profile_ids{P.profile.id,1}(ii,1)
+                            Nn=Nn+1;
+                            dummy_ids(Nn,:) = P.profile_ids{P.profile.id,1}(ii,:);
+                        end
+                    end
+                    if Nn~=Nr% something changed
+                        if Nn>1% two point (at least) must be present
+                            dummy_ids = dummy_ids(1:Nn,:);
+                            P.profile_ids{P.profile.id,1}   = dummy_ids;
+                            % P.profile_line  > no update;
+                            P.profile_onoff{P.profile.id,1}(val) = 0;
+                            %
+                            %set(h_shown_prof,'String',['prof. ',num2str(P.profile.id)])
+                        else
+                            fprintf('MESSAGE: Profile cannot comprise less than 2 stations.\n')
+                            fprintf('         Action was not performed,\n')
+                            fprintf('         station was not removed,\n')
+                            fprintf('         profile %d is unchanged.\n',P.profile.id)
+                        end
+                    end
+                end
+            end
+            Update_profile_locations(hAx_main_geo);
+            %is_done();
+        else
+            Message = sprintf('NO PROFILES WERE CREATED\n. \nProfile Creation: (On "Main" Tab)\n1) Define profiles by right-clicking on the map.\n2) Click to set the profile''s start point.\n3) Click again to set the profile''s end point.\n4) Include stations by entering the desired distance from profile.\n5) Use add/remove buttons to include/exclude single stations.\n \nProfile Visualization: (on this Tab)\n1) Select a profile to be shown using the [-][->][+] buttons.\n2) Select a the property to be shown using buttons on the rigth.');
+            msgbox(Message,'INFO')
+            return;
+        end
     end
 %% TAB-2: =================================================
 %% TAB-2, Panel-1: Inversion
@@ -2700,6 +3603,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 bgc = 0.9*[1 1 1];
                 set(T2_P1_inv_button_bw,'BackgroundColor',bgc);
             end
+            %set(hObject,'Value',0)
+            %set(hObject,'String','START Inversion (P/S)')
         else
             fprintf('No data was loaded. Please load a project.\n')
         end
@@ -2990,161 +3895,295 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 %% TAB-3: =================================================
 %% TAB-3, Panel-1
     function B_lock_model(~,~,~)
-        if (0 < data_1d_to_show) && (data_1d_to_show < length(TO_INVERT))
-            if(TO_INVERT(data_1d_to_show) ~= 0)
-               TO_INVERT(data_1d_to_show) = 2; 
+        if (0 < P.isshown.id) && (P.isshown.id < length(TO_INVERT))
+            if(TO_INVERT(P.isshown.id) ~= 0)
+               TO_INVERT(P.isshown.id) = 2; 
+               Update_survey_locations(hAx_main_geo);
                Update_survey_locations(hAx_geo);
             end
         end
     end
     function B_unlock_model(~,~,~)
-        if (0 < data_1d_to_show) && (data_1d_to_show < length(TO_INVERT))
-            if(TO_INVERT(data_1d_to_show) ~= 0)
-                TO_INVERT(data_1d_to_show) = 1;
+        if (0 < P.isshown.id) && (P.isshown.id < length(TO_INVERT))
+            if(TO_INVERT(P.isshown.id) ~= 0)
+                TO_INVERT(P.isshown.id) = 1;
+                Update_survey_locations(hAx_main_geo);
                 Update_survey_locations(hAx_geo);
             end
         end
     end
-    function BT_insert_break(~,~,~)
-        %[xval,~] = ginput(1);
-        if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
-            [xval,~] = sam2018b_ginput(1);
-        else
-            [xval,~] = ginput(1);
-        end
-        %;% take points
-        for m = 2:size(SURVEYS,1)
-            x0 = SURVEYS{m-1,1}(1);
-            x1 = SURVEYS{m,1}(1);
-            XX = xval;
-            if(x0<XX && XX<x1) 
-                BREAKS(m) = 1;
-                fprintf('Break inserted between %d and %d\n',(m-1),m)
-            end
-        end
-        warning('For now, Breaks are only valid along X.')
-        Update_survey_locations(hAx_geo);
-    end
-    function BT_delete_breaks(~,~,~)
-        %[xval,~] = ginput(1);
-        if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
-            [xval,~] = sam2018b_ginput(1);
-        else
-            [xval,~] = ginput(1);
-        end
-        %;% take points
-        for m = 2:size(SURVEYS,1)
-            x0 = SURVEYS{m-1,1}(1);
-            x1 = SURVEYS{m,1}(1);
-            XX = xval;
-            if(x0<XX && XX<x1) 
-                BREAKS(m) = 0;
-                fprintf('Break removed between %d and %d\n',(m-1),m)
-            end
-        end
-        warning('For now, Breaks are only valid along X.')
-        Update_survey_locations(hAx_geo);
-    end
+%%     function BT_insert_break(~,~,~)
+%         %[xval,~] = ginput(1);
+%         if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
+%             [xval,~] = sam2018b_ginput(1);
+%         else
+%             [xval,~] = ginput(1);
+%         end
+%         %;% take points
+%         for m = 2:size(SURVEYS,1)
+%             x0 = SURVEYS{m-1,1}(1);
+%             x1 = SURVEYS{m,1}(1);
+%             XX = xval;
+%             if(x0<XX && XX<x1) 
+%                 BREAKS(m) = 1;
+%                 fprintf('Break inserted between %d and %d\n',(m-1),m)
+%             end
+%         end
+%         warning('For now, Breaks are only valid along X.')
+%Update_survey_locations(hAx_main_geo);
+%         Update_survey_locations(hAx_geo);
+%     end
+%%     function BT_delete_breaks(~,~,~)
+%         %[xval,~] = ginput(1);
+%         if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
+%             [xval,~] = sam2018b_ginput(1);
+%         else
+%             [xval,~] = ginput(1);
+%         end
+%         %;% take points
+%         for m = 2:size(SURVEYS,1)
+%             x0 = SURVEYS{m-1,1}(1);
+%             x1 = SURVEYS{m,1}(1);
+%             XX = xval;
+%             if(x0<XX && XX<x1) 
+%                 BREAKS(m) = 0;
+%                 fprintf('Break removed between %d and %d\n',(m-1),m)
+%             end
+%         end
+%         warning('For now, Breaks are only valid along X.')
+%Update_survey_locations(hAx_main_geo);
+%         Update_survey_locations(hAx_geo);
+%     end
+%%
     function define_Profile(~,~,~)
-        [x,y] = ginput(2);
-        if( (x(1)==x(2)) && (y(1)==y(2))); return; end
-        profile_line = [x,y];
-        profile_ids  = [];
-        
-        % get distance
-        prompt = {'Distance from profile'};
-        def = {num2str(r_distance_from_profile)};
-        answer = inputdlg(prompt,'distance (m)',1,def);
-        if(isempty(answer)); return; end
-        r_distance_from_profile = str2double(answer{1});
-        
-        
-        % filter measurement points
-        recta_kind = 0;
+        if isempty(SURVEYS); return; end
         Np = size(receiver_locations,1);
-        if(x(1)==x(2)) % rect x=constant
-            recta_kind = 1;
-            for id = 1:Np
-                if( abs(receiver_locations(id,1)-x(1)) < r_distance_from_profile)
-                    dr = receiver_locations(id,2)-y(1); 
-                    far = abs(receiver_locations(id,1)-x(1));
-                    profile_ids = [profile_ids; [id, dr, far]];                               
+        recta_kind = 0;
+        if Matlab_Release_num>2017.1% Solve ginput issuewith R2017b and above
+            [xx,yy] = sam2018b_ginput(2, hAx_main_geo);%hAx_main_geo);
+        else
+            [xx,yy] = ginput(2, hAx_main_geo);% hAx_main_geo);
+        end
+        if( (xx(1)==xx(2)) && (yy(1)==yy(2))); return; end
+        dummy_ids = zeros(Np,3);
+        dummy_line    = [xx,yy];
+        dummy_onoff   = zeros(Np,1);% 
+        %
+        %axes(hAx_main_geo)
+        lne = plot(hAx_main_geo,xx,yy,'k');
+        %
+        prompt = {'Select the ID of the farthest station','Custom name'};
+        def = {'0','none'};
+        %
+        answer = inputdlg(prompt,'info request',[1 35],def);
+        if(isempty(answer)); return; end
+        %
+        id_farhest = str2double(answer{1});
+        profile_name = answer{2};
+        if (0<id_farhest) && (id_farhest<=Np)
+            % filter measurement points
+            found_ids = 0;
+            if(xx(1)==xx(2)) % rect x=constant
+                recta_kind = 1;
+                r_distance_from_profile = abs(receiver_locations(id_farhest,1)-xx(1));
+                for ii = 1:Np
+                    if( abs(receiver_locations(ii,1)-xx(1)) <= r_distance_from_profile)
+                        dr = receiver_locations(ii,2)-yy(1);
+                        far = abs(receiver_locations(ii,1)-xx(1));
+                        found_ids=found_ids+1;
+                        dummy_ids(found_ids,1:3) = [ii, dr, far];
+                    end
+                end
+            end
+            if(yy(1)==yy(2)) % rect y=constant
+                r_distance_from_profile = abs(receiver_locations(id_farhest,2)-yy(1));
+                for ii = 1:Np
+                    recta_kind = 2;
+                    if( abs(receiver_locations(ii,2)-yy(1)) <= r_distance_from_profile)
+                        dr = receiver_locations(ii,1)-xx(1);
+                        far = abs(receiver_locations(ii,2)-yy(1));
+                        found_ids=found_ids+1;
+                        dummy_ids(found_ids,1:3) = [ii, dr, far];
+                    end
+                end
+            end
+            if(recta_kind==0)% rect y=mx+q    q=y-mx            
+                m1 = (yy(2)-yy(1))/(xx(2)-xx(1));
+                q1 = yy(1) - m1*xx(1);
+                dist = abs(receiver_locations(:,2) - (m1*receiver_locations(:,1) +q1))/sqrt(1+m1^2);% Equation 1
+                r_distance_from_profile = dist(id_farhest);
+                %% info
+                % r1:  y = m1 x + q1 (profile)
+                % r2:  y = m2 x + q2 (line through the receiver and perpendicular to r1)
+                %
+                % rect given endpoints
+                % r1 = m1 x + q1:    (ax +by +c = 0)
+                %     a = y2-y1
+                %     b = x2-x1
+                %     c = x2 y1 - y2 x1
+                %     m1 = -a/b = -(y2-y1)/(x2-x1) 
+                %     q1  = y1 -m1 x1
+                %
+                % distance of point p (receiver) from the rect r1 (the profile). (Equation 1)
+                % dist = |yp - m1 xp -q1 | / sqrt(1 + m1^1)
+                %
+                % rect (r2) through a point p and perpendicular to r1 (y=m1 x +q1):
+                % y = m2 xp + q2
+                % m2  = -1/m1
+                % q2 = yp - m2 xp == yp +xp/m1  (Equation 2)
+                %
+                % point of intersection of two rects
+                % [ y = m2 x + q2
+                % [ y = m1 x + q1
+                %
+                % [ y = m2 x + q2
+                % [ m2 x + q2 = m1 x + q1 -> x(m2-m1) = (q1-q2)
+                %
+                % [ y = m2 (q1-q2)/(m2-m1)+ q2
+                % [ x = (q1-q2)/(m2-m1) 
+                %%
+                m2 = -1/m1;
+                q2 = receiver_locations(:,2) + receiver_locations(:,1)/m1;%  (Equation 2)
+                xp = (q1-q2)/(m2-m1);%             Point of intersection
+                yp = m2*(q1-q2)/(m2-m1)+q2;% Point of intersection 
+                drs= sqrt( (xx(1)-xp).^2 + (yy(1)-yp).^2 );% distances from beginning of profile
+                %
+                for ii = 1:Np
+                    far = dist(ii);
+                    dr  = drs(ii);
+                    if(xp(ii) < xx(1))
+                        dr = -dr;
+                    end
+
+                    if( dist(ii) <= r_distance_from_profile)
+                        found_ids=found_ids+1;
+                        dummy_ids(found_ids,1:3) = [ii, dr, far];% [station-ID][distance from profile beginning][distance from profile]
+                        % val = station-ID
+                        % dr  = distance (along profile) from profile beginning
+                        % far = distance from profile
+                    end
+                end
+            end
+            if found_ids>0% some suitable measurement were found
+                dummy_ids = dummy_ids(1:found_ids,:);
+                if found_ids>1% at least two station per profile
+                    if ~isempty(P.profile_ids)
+                        pid = size(P.profile_ids,1) +1;
+                    else
+                        pid=1;
+                        P.profile.id=1;
+                    end
+                    %
+                    [~,idx] = sort(dummy_ids(:,2)); % sort just the first column
+                    sortedmat = dummy_ids(idx,:);   % sort the whole matrix using the sort indices
+                    %
+                    % check for double entries (same longitudinal distance, to be avoided)
+                    original_sortedmat = sortedmat;
+                    distance_checked = 0;
+                    current_line=0; 
+                    for pp=1:found_ids
+                        [r,~]= find(original_sortedmat(:,2)==original_sortedmat(pp,2));
+                        if original_sortedmat(pp,2) > distance_checked
+                            current_line = current_line+1;
+                            sortedmat( current_line, :) =  original_sortedmat(r(1),:);
+                            distance_checked = original_sortedmat(pp,2); 
+                        end
+                    end
+                    sortedmat = sortedmat(1:current_line,:);
+                    if size(sortedmat,1)~=size(original_sortedmat,1)
+                        Message = sprintf('MESSAGE: Some stations were not included in the profile\nbecause they would occupy the same location.');
+                        %waitfor(warndlg(Message,'INFO'));
+                        fprintf('%s\n',Message);
+                    end
+                    % set which surveys are included
+                    dummy_onoff(sortedmat(:,1)) = 1; 
+                    %
+                    %
+                    P.profile_ids{pid,1}   = sortedmat;
+                    P.profile_line{pid,1}  = dummy_line;
+                    P.profile_onoff{pid,1} = dummy_onoff;
+                    P.profile_name{pid,1} = profile_name;
+                    %profile_ids   = sortedmat;
+                    %profile_line  = dummy_line;
+                    %
+                    Update_survey_locations(hAx_main_geo);
+                    Update_survey_locations(hAx_geo)
                 end
             end
         end
-        if(y(1)==y(2)) % rect y=constant
-            for id = 1:Np
-                recta_kind = 2; 
-                if( abs(receiver_locations(id,2)-y(1)) < r_distance_from_profile)
-                    dr = receiver_locations(id,1)-x(1); 
-                    far = abs(receiver_locations(id,2)-y(1));
-                    profile_ids = [profile_ids; [id, dr, far]];                               
-                end
-            end
-        end
-        if(recta_kind==0) % rect y=mx+q    q=y-mx
-            m1 = (y(2)-y(1))/(x(2)-x(1));
-            q1 = y(1) - m1*x(1);
-            dist = abs(receiver_locations(:,2) - (m1*receiver_locations(:,1) +q1))/sqrt(1+m1^2);
-            % r1:  y = m1 x + q1
-            % r2:  y = m2 x + q2
-            %
-            % r passante per un pto e perp a retta data (y=m1 x +q):
-            % y = m2 xp + q2
-            % m2  = -1/m1
-            % q2 = yp - m2 xp == yp +xp/m1  (A)
-            %
-            % pto di intersezione di due rette
-            %  x = -(q1-q2)/(m1-m2)
-            %  y = -m1 (q1-q2)/(m1-m2) +q1
-            %
-            m2 = -1/m1;
-            q2 = receiver_locations(:,2) + receiver_locations(:,1)/m1;%  (A)
-            xp = (q2-q1)/(m1-m2);
-            yp = (m1*(q2-q1)/(m1-m2)+q1); 
-            drs= sqrt( (x(1)-xp).^2 + (y(1)-yp).^2 );
-            for id = 1:Np
-                far = dist(id);
-                dr  = drs(id);
-                if(xp(id) < x(1)) 
-                    dr = -dr;
-                end
-                    
-                if( dist(id) < r_distance_from_profile)
-                     profile_ids = [profile_ids; [id, dr, far]];                               
-                end
-            end
-        end
-        sortrows(profile_ids,2)
-        
-        % enable only the profile
-        tmp = 0*TO_INVERT;
-        for j=1:Np; 
-            if(TO_INVERT(j)==2) 
-                tmp(j)=2;
-            end
-        end
-        for j=1:size(profile_ids,1); tmp(profile_ids(j,1)) = 1; end
-        TO_INVERT =tmp;
-        
-        Update_survey_locations(hAx_geo);
+        delete(lne);
     end
+    function reset_Profile(~,~,~)
+        hAx_main_geo = hAx_geo;%   compatibility
+        if isempty(SURVEYS); return; end
+        P.profile_line = {};
+        P.profile_ids  = {};
+        P.profile_onoff = {};
+        P.profile_name={};
+        %  
+        Update_survey_locations(hAx_main_geo);
+        Update_survey_locations(hAx_geo)
+    end
+    function reset_one_Profile(~,~,~)
+        hAx_main_geo = hAx_geo;%   compatibility
+        if isempty(SURVEYS); return; end
+        if isempty(P.profile_ids); return; end
+        if size(P.profile_ids,1)<2
+            P.profile_line = {};
+            P.profile_ids  = {};
+            P.profile_onoff = {};
+            P.profile_name={};
+        else
+
+            prompt = {'Select the ID of the profile to discard'};
+            def = {'0'};% {num2str(r_distance_from_profile)};
+            answer = inputdlg(prompt,'ID?',1,def);
+            if(isempty(answer)); return; end
+            p_id = str2double(answer{1});
+            if p_id > size(P.profile_ids,1); return; end
+            if p_id <1; return; end
+
+            Nprf = size(P.profile_ids,1);
+            temp_line = P.profile_line;
+            temp_ids = P.profile_ids;
+            temp_onoff  = P.profile_onoff;
+            temp_name = P.profile_name;
+
+            P.profile_line = cell(Nprf-1,1);
+            P.profile_ids = cell(Nprf-1,1);    
+            P.profile_onoff = cell(Nprf-1,1);
+            P.profile_name = cell(Nprf-1,1);
+            nowid = 0;
+            for ipid = 1:Nprf 
+                if ipid == p_id; continue; end
+                nowid = nowid + 1;
+                P.profile_line{nowid,1} = temp_line{ipid,1};
+                P.profile_ids{nowid,1}  = temp_ids{ipid,1};  
+                P.profile_onoff{nowid,1} = temp_onoff{ipid,1};
+                P.profile_name{nowid,1}  = temp_name{ipid,1}; 
+            end
+        end
+        %  
+        Update_survey_locations(hAx_main_geo);
+        Update_survey_locations(hAx_geo)
+    end
+    
 %% TAB-3, Panel-2: data
     function CM_hAx_dat_disable(~,~,~)
        [boxx,boxy] = getsquare();
        %drawsquare(hAx_dat,boxx,boxy)
-       new_discards = find_graph_encosed_points( [FDAT{data_1d_to_show,1},FDAT{data_1d_to_show,2}], boxx,boxy);
-       if(isempty(DISCARDS{data_1d_to_show}))
-           DISCARDS{data_1d_to_show} = new_discards;
+       new_discards = find_graph_encosed_points( [FDAT{P.isshown.id,1},FDAT{P.isshown.id,2}], boxx,boxy);
+       if(isempty(DISCARDS{P.isshown.id}))
+           DISCARDS{P.isshown.id} = new_discards;
        else
-           DISCARDS{data_1d_to_show} = [ DISCARDS{data_1d_to_show}; new_discards]; 
+           DISCARDS{P.isshown.id} = [ DISCARDS{P.isshown.id}; new_discards]; 
        end
        Show_survey(hAx_dat);
     end
     function CM_hAx_dat_enable(~,~,~)
-       DISCARDS{data_1d_to_show} = [];
+       DISCARDS{P.isshown.id} = [];
        Show_survey(hAx_dat);
-       %DISCARDS{data_1d_to_show}%------------------------------------------ FIX  need to be more efficient
+       %DISCARDS{P.isshown.id}%------------------------------------------ FIX  need to be more efficient
     end
     function CM_hAx_dat_show_lin(~,~,~)
         if(size(weight_curv,1) > 0)
@@ -3162,100 +4201,43 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     function CM_hAx_mod_modify(~,~,~)
         if(isempty(MDLS)); return; end
         model_manager( get(hTab_mod,'Data') );
-        set(hTab_mod,'Data', MDLS{data_1d_to_show});
+        set(hTab_mod,'Data', MDLS{P.isshown.id});
     end
 %% TAB-3, Panel-4: Inversion
-    function CM_hAx_geo_back(~,~,~)
-        Ndat = size(FDAT,1);
-        if(Ndat>0)
-            val = data_1d_to_show;
-            switch(data_1d_to_show)
-                case 0; val = Ndat; 
-                case 1; val = Ndat;    
-                otherwise; val = val -1;    
-            end
-            data_1d_to_show = val;
-            
-            prev_MDLS = MDLS;
-            prev_BEST_SINGLE_MODELS = BEST_SINGLE_MODELS;
-            prev_best_FDAT = best_FDAT;
-            prev_BEST_SINGLE_MISFIT = BEST_SINGLE_MISFIT;
-            prev_single_it = independent_optimiazation_cicles(data_1d_to_show);
-
-            last_single_FDAT = cell(1,2); 
-            
-            set(T3_P1_it_count,'String',strcat( num2str(independent_optimiazation_cicles(data_1d_to_show)),' so far'));
-            Update_survey_locations(hAx_geo);
-            Show_survey(hAx_dat);
-            %plot_1d_profile(hAx_1dprof);
-            
-            hold(hAx_1dprof,'off');
-            draw_1d_profile(hAx_1dprof, MDLS{data_1d_to_show},'k',1);
-        end
-    end
-    function CM_hAx_geo_next(~,~,~)
-        Ndat = size(FDAT,1);
-        if(Ndat>0)
-            val = data_1d_to_show;
-            switch(data_1d_to_show)
-                case 0; val = 1; 
-                case Ndat; val = 1;    
-                otherwise; val = val +1;    
-            end
-            data_1d_to_show = val;
-        
-            prev_MDLS = MDLS;
-
-            prev_BEST_SINGLE_MODELS = BEST_SINGLE_MODELS;
-            prev_best_FDAT = best_FDAT;
-            prev_BEST_SINGLE_MISFIT = BEST_SINGLE_MISFIT;
-            prev_single_it = independent_optimiazation_cicles(data_1d_to_show);
-
-            last_single_FDAT = cell(1,2); 
-        
-			set(T3_P1_it_count,'String',strcat( num2str(independent_optimiazation_cicles(data_1d_to_show)),' so far'));
-			Update_survey_locations(hAx_geo);
-            Show_survey(hAx_dat);
-            %plot_1d_profile(hAx_1dprof);
-            
-            hold(hAx_1dprof,'off');
-            draw_1d_profile(hAx_1dprof, MDLS{data_1d_to_show},'k',1);
-		end
-    end
     function CM_hAx_keep_and_spread_model(~,~,~)
         for ii = 1:size(SURVEYS,1)
-            if(ii ~= data_1d_to_show)
-                MDLS{ii} = MDLS{data_1d_to_show};
+            if(ii ~= P.isshown.id)
+                MDLS{ii} = MDLS{P.isshown.id};
             end
         end
     end
     function CM_hAx_keep_and_spread_left(~,~,~)
-        if(data_1d_to_show>1)
-            MDLS{data_1d_to_show-1} = MDLS{data_1d_to_show};
+        if(P.isshown.id>1)
+            MDLS{P.isshown.id-1} = MDLS{P.isshown.id};
         end
     end
     function CM_hAx_keep_and_spread_right(~,~,~)
-        if(data_1d_to_show<size(SURVEYS,1))
-            MDLS{data_1d_to_show+1} = MDLS{data_1d_to_show};
+        if(P.isshown.id<size(SURVEYS,1))
+            MDLS{P.isshown.id+1} = MDLS{P.isshown.id};
         end
     end
     function CM_hAx_keep_and_spread_to(~,~,~)
         warning('Function under debug.')
         prompt = {'Select destination model'};
-        def = {num2str(data_1d_to_show)};
+        def = {num2str(P.isshown.id)};
         answer = inputdlg(prompt,'Spread To',1,def)
         if(~isempty(answer))
             destination_id = str2double(answer)
             if (destination_id>0) && (destination_id<=size(SURVEYS,1))
-                MDLS{destination_id} = MDLS{data_1d_to_show};
-                fprintf('Model %d copied to position %d.\n',data_1d_to_show,destination_id)
+                MDLS{destination_id} = MDLS{P.isshown.id};
+                fprintf('Model %d copied to position %d.\n',P.isshown.id,destination_id)
             end
         end
     end
     function CM_hAx_double_all_layers(~,~,~)
         warning('Function under debug:CM_hAx_double_all_layers LOOK CONSEQUENCES.')
         %for ii = 1:size(SURVEYS,1)
-        temp = MDLS{data_1d_to_show};
+        temp = MDLS{P.isshown.id};
         newm = zeros(2*size(temp,1)-1, size(temp,2));
         for ll = 1:size(temp,1)-1
             thick = 0.5*temp(ll,4);
@@ -3267,11 +4249,11 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         newm(end,:) = temp(end,:);
 
 
-        MDLS{data_1d_to_show} = newm;
+        MDLS{P.isshown.id} = newm;
         
         Show_survey(hAx_dat);
         hold(hAx_1dprof,'off');
-        draw_1d_profile(hAx_1dprof, MDLS{data_1d_to_show},'k',1);
+        draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
             
     end
     function CM_hAx_double_a_layer(~,~,~)
@@ -3282,8 +4264,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         answer = inputdlg(prompt,'Unite with next',1,def);
         if(~isempty(answer))
             lid = str2double(answer{1});
-            if (lid>0) && (lid<size(MDLS{data_1d_to_show},1))
-                temp = MDLS{data_1d_to_show};
+            if (lid>0) && (lid<size(MDLS{P.isshown.id},1))
+                temp = MDLS{P.isshown.id};
                 newm = zeros( size(temp,1)+1, size(temp,2));
                 countl = 0;
                 for ll = 1:(size(temp,1)-1)% only layers
@@ -3307,14 +4289,15 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                     %clc
                 end
                 newm(end,:) = temp(end,:); 
-                MDLS{data_1d_to_show} = newm;
+                MDLS{P.isshown.id} = newm;
                 
                 %Update_survey_locations(hAx_geo);
+                %Update_survey_locations(hAx_main_geo);
                 Show_survey(hAx_dat);
                 %plot_1d_profile(hAx_1dprof);
 
                 hold(hAx_1dprof,'off');
-                draw_1d_profile(hAx_1dprof, MDLS{data_1d_to_show},'k',1);
+                draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
             end
         end
     end
@@ -3330,8 +4313,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         if(~isempty(answer))
             up = str2double(answer{1});
             dwn= up+1;
-            if (up>0) && (up<size(MDLS{data_1d_to_show},1)-1)
-                temp = MDLS{data_1d_to_show};
+            if (up>0) && (up<size(MDLS{P.isshown.id},1)-1)
+                temp = MDLS{P.isshown.id};
                 newm = zeros( size(temp,1)-1, size(temp,2));
                 countl = 0;
                 for ll = 1:(size(temp,1)-1)% only layers
@@ -3350,14 +4333,15 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                     %clc
                 end
                 newm(end,:) = temp(end,:); 
-                MDLS{data_1d_to_show} = newm;
+                MDLS{P.isshown.id} = newm;
                 
                 %Update_survey_locations(hAx_geo);
+                %Update_survey_locations(hAx_main_geo);
                 Show_survey(hAx_dat);
                 %plot_1d_profile(hAx_1dprof);
 
                 hold(hAx_1dprof,'off');
-                draw_1d_profile(hAx_1dprof, MDLS{data_1d_to_show},'k',1);
+                draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
             end
         end
     end
@@ -3368,27 +4352,30 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     function CM_hAx_geo_show(~,~,~)
         if( get(T3_P1_inv,'Value') == 0 )
             prompt = {'Select survey to show'};
-            def = {num2str(data_1d_to_show)};
+            def = {num2str(P.isshown.id)};
             answer = inputdlg(prompt,'aaa',1,def);
-            data_1d_to_show = str2double(answer);
+            P.isshown.id = str2double(answer);
+            Update_survey_locations(hAx_main_geo);
             Update_survey_locations(hAx_geo);
             Show_survey(hAx_dat);
         end
     end
     function CM_hAx_geo_disable(~,~,~)
-        if (0 < data_1d_to_show) && (data_1d_to_show < length(TO_INVERT))
-            TO_INVERT(data_1d_to_show) = 0;
+        if (0 < P.isshown.id) && (P.isshown.id < length(TO_INVERT))
+            TO_INVERT(P.isshown.id) = 0;
+            Update_survey_locations(hAx_main_geo);
             Update_survey_locations(hAx_geo);    
         end
     end
     function CM_hAx_geo_enable(~,~,~)
-        if (0 < data_1d_to_show) && (data_1d_to_show < length(TO_INVERT))
-            TO_INVERT(data_1d_to_show) = 1;
+        if (0 < P.isshown.id) && (P.isshown.id < length(TO_INVERT))
+            TO_INVERT(P.isshown.id) = 1;
+            Update_survey_locations(hAx_main_geo);
             Update_survey_locations(hAx_geo);   
         end
     end
     function B_start_inversion__independently(hObject,~,~)
-       if(~isempty(FDAT) && data_1d_to_show)  
+       if(~isempty(FDAT) && P.isshown.id)  
            if ~isempty(inversion_is_started__inedipendent)
                if(~strcmp(inversion_is_started__inedipendent,'BW'))
                    quest = 'It is not advisable to mix Body and Surface Waves inversions. Continue?';
@@ -3398,25 +4385,25 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                end
            end
            bgc = [1 0.5 0.1];
-            set(hObject,'BackgroundColor',bgc);
+           set(hObject,'BackgroundColor',bgc);
            x_vec = get_x_ranges();
 
             %% init
-            last_single_MDL = MDLS{data_1d_to_show};
+            last_single_MDL = MDLS{P.isshown.id};
             last_single_FDAT{1,1} = main_scale;
 
             init_single_FDAT = cell(1,2);
             init_single_FDAT{1,1} = main_scale;
             
             %% cycle
-            previous_iii = independent_optimiazation_cicles(data_1d_to_show);
+            previous_iii = independent_optimiazation_cicles(P.isshown.id);
             iii = 0;
             iii_global = previous_iii;
             %
             set(hObject,'String','STOP')  
             togo = str2double(get(T3_P1_max_it,'String'));
             
-            if(TO_INVERT(data_1d_to_show) == 1)%                               Assuming model is not locked  
+            if(TO_INVERT(P.isshown.id) == 1)%                               Assuming model is not locked  
                 inversion_is_started__inedipendent= 'BW';
                 while (get(hObject,'Value') && (togo > 0) )
                     
@@ -3428,13 +4415,13 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                         % iii == 1 is always the initial model evaluation
                         %clc
                         
-                        last_single_MDL = perturbe_single_model( MDLS{data_1d_to_show} );
-                        %fprintf('perturbed!   %f\n',max(max( abs(MDLS{data_1d_to_show}-last_single_MDL) )))
+                        last_single_MDL = perturbe_single_model( MDLS{P.isshown.id} );
+                        %fprintf('perturbed!   %f\n',max(max( abs(MDLS{P.isshown.id}-last_single_MDL) )))
                         %pause
                     %else
                     %    fprintf('model not perturbed\n')
                     end
-                    %fprintf('%d][C] perturbation [%f][%f][%f][%f][%f][%f]\n',iii, max( abs(MDLS{data_1d_to_show}-last_single_MDL) ) );
+                    %fprintf('%d][C] perturbation [%f][%f][%f][%f][%f][%f]\n',iii, max( abs(MDLS{P.isshown.id}-last_single_MDL) ) );
                     %pause
                     
                     nc = 2;%size(FDAT,2);
@@ -3452,21 +4439,21 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                     end
                     %% ====================================================
                     %
-                    for j = 1:nc; last_FDAT{data_1d_to_show,j} = last_single_FDAT{1,j}; end
+                    for j = 1:nc; last_FDAT{P.isshown.id,j} = last_single_FDAT{1,j}; end
                     %           
-                    [Single_Misfit, ctrm, strm, er] = get_single_model_misfit(data_1d_to_show, last_single_FDAT{2} );
-                    %fprintf('MOD[%d]   MISFIT[%f]\n',data_1d_to_show,Single_Misfit);
+                    [Single_Misfit, ctrm, strm, er] = get_single_model_misfit(P.isshown.id, last_single_FDAT{2} );
+                    %fprintf('MOD[%d]   MISFIT[%f]\n',P.isshown.id,Single_Misfit);
                     %
                     %% results storage           
                     Store_Single_Result(Single_Misfit,last_single_MDL, ctrm, strm);
-                    STORED_RESULTS_1d_misfit{data_1d_to_show} = [STORED_RESULTS_1d_misfit{data_1d_to_show}; [Single_Misfit, er]];
-                    STORED_1d_vp_fits{data_1d_to_show} = [STORED_1d_vp_fits{data_1d_to_show}; last_single_MDL(:,1).'];% VP.'];
-                    STORED_1d_vs_fits{data_1d_to_show} = [STORED_1d_vs_fits{data_1d_to_show}; last_single_MDL(:,2).'];% VS.'];
-                    STORED_1d_ro_fits{data_1d_to_show} = [STORED_1d_ro_fits{data_1d_to_show}; last_single_MDL(:,3).'];% RO.'];
-                    STORED_1d_hh_fits{data_1d_to_show} = [STORED_1d_hh_fits{data_1d_to_show}; last_single_MDL(:,4).'];% HH.'];
-                    STORED_1d_qp_fits{data_1d_to_show} = [STORED_1d_qp_fits{data_1d_to_show}; last_single_MDL(:,5).'];% QP.'];
-                    STORED_1d_qs_fits{data_1d_to_show} = [STORED_1d_qs_fits{data_1d_to_show}; last_single_MDL(:,6).'];% QS.'];
-                    STORED_1d_daf_fits{data_1d_to_show}= [STORED_1d_daf_fits{data_1d_to_show}; DAF];
+                    STORED_RESULTS_1d_misfit{P.isshown.id} = [STORED_RESULTS_1d_misfit{P.isshown.id}; [Single_Misfit, er]];
+                    STORED_1d_vp_fits{P.isshown.id} = [STORED_1d_vp_fits{P.isshown.id}; last_single_MDL(:,1).'];% VP.'];
+                    STORED_1d_vs_fits{P.isshown.id} = [STORED_1d_vs_fits{P.isshown.id}; last_single_MDL(:,2).'];% VS.'];
+                    STORED_1d_ro_fits{P.isshown.id} = [STORED_1d_ro_fits{P.isshown.id}; last_single_MDL(:,3).'];% RO.'];
+                    STORED_1d_hh_fits{P.isshown.id} = [STORED_1d_hh_fits{P.isshown.id}; last_single_MDL(:,4).'];% HH.'];
+                    STORED_1d_qp_fits{P.isshown.id} = [STORED_1d_qp_fits{P.isshown.id}; last_single_MDL(:,5).'];% QP.'];
+                    STORED_1d_qs_fits{P.isshown.id} = [STORED_1d_qs_fits{P.isshown.id}; last_single_MDL(:,6).'];% QS.'];
+                    STORED_1d_daf_fits{P.isshown.id}= [STORED_1d_daf_fits{P.isshown.id}; DAF];
                     %
                     %
                     togo = togo-1;
@@ -3476,18 +4463,18 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 
                 Show_survey(hAx_dat);
                 hold(hAx_1dprof,'off')
-                draw_1d_profile(hAx_1dprof, vfst_MDLS{data_1d_to_show},'b',1);
-                draw_1d_profile(hAx_1dprof, MDLS{data_1d_to_show},'k',1);
+                draw_1d_profile(hAx_1dprof, vfst_MDLS{P.isshown.id},'b',1);
+                draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
                 %plot_1d_profile(hAx_1dprof);
                 hold(hAx_1dprof,'off')
-                draw_Misfit_vs_it(h_gui, hAx_MvsIT);
+                draw_Misfit_vs_it(H.gui, hAx_MvsIT);
                 
-                independent_optimiazation_cicles(data_1d_to_show) =  iii_global;
+                independent_optimiazation_cicles(P.isshown.id) =  iii_global;
                 set(hObject,'Value',0)
                 set(T3_P1_it_count,'String',strcat( num2str(iii_global),' so far'));
             else
-                if(TO_INVERT(data_1d_to_show) == 0); msgbox('THIS MODEL IS NOT IN USE','Communication','warn'); end
-                if(TO_INVERT(data_1d_to_show) == 2); msgbox('THIS MODEL IS LOCKED.',   'Communication','warn'); end
+                if(TO_INVERT(P.isshown.id) == 0); msgbox('THIS MODEL IS NOT IN USE','Communication','warn'); end
+                if(TO_INVERT(P.isshown.id) == 2); msgbox('THIS MODEL IS LOCKED.',   'Communication','warn'); end
             end
             set(hObject,'Value',0)
             set(hObject,'String','Optimize (P/S)')
@@ -3503,10 +4490,10 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
        set(h_1d_next,      'Enable','on'); 
        set(T3_p1_revert,   'Enable','on');
        bgc = 0.9*[1 1 1];
-        set(hObject,'BackgroundColor',bgc);
+       set(hObject,'BackgroundColor',bgc);
     end
     function B_start_inversion__independently_SW(hObject,~,~)
-       if(~isempty(FDAT) && data_1d_to_show)
+       if(~isempty(FDAT) && P.isshown.id)
            if ~isempty(inversion_is_started__inedipendent)
                if(~strcmp(inversion_is_started__inedipendent,'SW'))
                    quest = 'It is not advisable to mix Body and Surface Waves inversions. Continue?';
@@ -3521,21 +4508,21 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             xmax = str2double( get(h_scale_max,'String') );
             ddx   = str2double( get(h_dscale,  'String') );
             %% init
-            last_single_MDL = MDLS{data_1d_to_show};
+            last_single_MDL = MDLS{P.isshown.id};
             last_single_FDAT{1,1} = main_scale;
 
             init_single_FDAT = cell(1,2);
             init_single_FDAT{1,1} = main_scale;
             
             %% cycle
-            previous_iii = independent_optimiazation_cicles(data_1d_to_show);
+            previous_iii = independent_optimiazation_cicles(P.isshown.id);
             iii = 0;
             iii_global = previous_iii;
             %
             set(hObject,'String','STOP')  
             togo = str2double(get(T3_P1_max_it,'String'));
             
-            if(TO_INVERT(data_1d_to_show) == 1)%                               Assuming model is not locked  
+            if(TO_INVERT(P.isshown.id) == 1)%                               Assuming model is not locked  
                 inversion_is_started__inedipendent= 'SW';
                 while (get(hObject,'Value') && (togo > 0) )
                     
@@ -3546,13 +4533,13 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                     if(iii > 1) 
                         % iii == 1 is always the initial model evaluation
                         %clc
-                        last_single_MDL = perturbe_single_model( MDLS{data_1d_to_show} );
-                        %fprintf('perturbed!   %f\n',max(max( abs(MDLS{data_1d_to_show}-last_single_MDL) )))
+                        last_single_MDL = perturbe_single_model( MDLS{P.isshown.id} );
+                        %fprintf('perturbed!   %f\n',max(max( abs(MDLS{P.isshown.id}-last_single_MDL) )))
                         %pause
                     %else
                     %    fprintf('model not perturbed\n')
                     end
-                    %fprintf('%d][C] perturbation [%f][%f][%f][%f][%f][%f]\n',iii, max( abs(MDLS{data_1d_to_show}-last_single_MDL) ) );
+                    %fprintf('%d][C] perturbation [%f][%f][%f][%f][%f][%f]\n',iii, max( abs(MDLS{P.isshown.id}-last_single_MDL) ) );
                     %pause
                     
                     nc = 2;%size(FDAT,2);
@@ -3583,21 +4570,21 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                     end
                     %% ====================================================
                     %
-                    for j = 1:nc; last_FDAT{data_1d_to_show,j} = last_single_FDAT{1,j}; end
+                    for j = 1:nc; last_FDAT{P.isshown.id,j} = last_single_FDAT{1,j}; end
                     %           
-                    [Single_Misfit, ctrm, strm, er] = get_single_model_misfit(data_1d_to_show, last_single_FDAT{2} );
-                    %fprintf('MOD[%d]   MISFIT[%f]\n',data_1d_to_show,Single_Misfit);
+                    [Single_Misfit, ctrm, strm, er] = get_single_model_misfit(P.isshown.id, last_single_FDAT{2} );
+                    %fprintf('MOD[%d]   MISFIT[%f]\n',P.isshown.id,Single_Misfit);
                     %
                     %% results storage           
                     Store_Single_Result(Single_Misfit,last_single_MDL, ctrm, strm);
-                    STORED_RESULTS_1d_misfit{data_1d_to_show} = [STORED_RESULTS_1d_misfit{data_1d_to_show}; [Single_Misfit, er]];
-                    STORED_1d_vp_fits{data_1d_to_show} = [STORED_1d_vp_fits{data_1d_to_show}; last_single_MDL(:,1).'];% VP.'];
-                    STORED_1d_vs_fits{data_1d_to_show} = [STORED_1d_vs_fits{data_1d_to_show}; last_single_MDL(:,2).'];% VS.'];
-                    STORED_1d_ro_fits{data_1d_to_show} = [STORED_1d_ro_fits{data_1d_to_show}; last_single_MDL(:,3).'];% RO.'];
-                    STORED_1d_hh_fits{data_1d_to_show} = [STORED_1d_hh_fits{data_1d_to_show}; last_single_MDL(:,4).'];% HH.'];
-                    STORED_1d_qp_fits{data_1d_to_show} = [STORED_1d_qp_fits{data_1d_to_show}; last_single_MDL(:,5).'];% QP.'];
-                    STORED_1d_qs_fits{data_1d_to_show} = [STORED_1d_qs_fits{data_1d_to_show}; last_single_MDL(:,6).'];% QS.'];
-                    STORED_1d_daf_fits{data_1d_to_show}= [STORED_1d_daf_fits{data_1d_to_show}; DAF];
+                    STORED_RESULTS_1d_misfit{P.isshown.id} = [STORED_RESULTS_1d_misfit{P.isshown.id}; [Single_Misfit, er]];
+                    STORED_1d_vp_fits{P.isshown.id} = [STORED_1d_vp_fits{P.isshown.id}; last_single_MDL(:,1).'];% VP.'];
+                    STORED_1d_vs_fits{P.isshown.id} = [STORED_1d_vs_fits{P.isshown.id}; last_single_MDL(:,2).'];% VS.'];
+                    STORED_1d_ro_fits{P.isshown.id} = [STORED_1d_ro_fits{P.isshown.id}; last_single_MDL(:,3).'];% RO.'];
+                    STORED_1d_hh_fits{P.isshown.id} = [STORED_1d_hh_fits{P.isshown.id}; last_single_MDL(:,4).'];% HH.'];
+                    STORED_1d_qp_fits{P.isshown.id} = [STORED_1d_qp_fits{P.isshown.id}; last_single_MDL(:,5).'];% QP.'];
+                    STORED_1d_qs_fits{P.isshown.id} = [STORED_1d_qs_fits{P.isshown.id}; last_single_MDL(:,6).'];% QS.'];
+                    STORED_1d_daf_fits{P.isshown.id}= [STORED_1d_daf_fits{P.isshown.id}; DAF];
                     %
                     %
                     togo = togo-1;
@@ -3607,18 +4594,18 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 
                 Show_survey(hAx_dat);
                 hold(hAx_1dprof,'off')
-                draw_1d_profile(hAx_1dprof, vfst_MDLS{data_1d_to_show},'b',1);
-                draw_1d_profile(hAx_1dprof, MDLS{data_1d_to_show},'k',1);
+                draw_1d_profile(hAx_1dprof, vfst_MDLS{P.isshown.id},'b',1);
+                draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
                 %plot_1d_profile(hAx_1dprof);
                 hold(hAx_1dprof,'off')
-                draw_Misfit_vs_it(h_gui, hAx_MvsIT);
+                draw_Misfit_vs_it(H.gui, hAx_MvsIT);
                 
-                independent_optimiazation_cicles(data_1d_to_show) =  iii_global;
+                independent_optimiazation_cicles(P.isshown.id) =  iii_global;
                 set(hObject,'Value',0)
                 set(T3_P1_it_count,'String',strcat( num2str(iii_global),' so far'));
             else
-                if(TO_INVERT(data_1d_to_show) == 0); msgbox('THIS MODEL IS NOT IN USE','Communication','warn'); end
-                if(TO_INVERT(data_1d_to_show) == 2); msgbox('THIS MODEL IS LOCKED.',   'Communication','warn'); end
+                if(TO_INVERT(P.isshown.id) == 0); msgbox('THIS MODEL IS NOT IN USE','Communication','warn'); end
+                if(TO_INVERT(P.isshown.id) == 2); msgbox('THIS MODEL IS LOCKED.',   'Communication','warn'); end
             end
             set(hObject,'Value',0)
             set(hObject,'String','Optimize (SW)')
@@ -3644,8 +4631,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             best_FDAT = prev_best_FDAT;
             BEST_SINGLE_MISFIT = prev_BEST_SINGLE_MISFIT;
 
-            independent_optimiazation_cicles(data_1d_to_show) = prev_single_it;
-            set(T3_P1_it_count,'String',strcat( num2str(independent_optimiazation_cicles(data_1d_to_show)),' so far'));
+            independent_optimiazation_cicles(P.isshown.id) = prev_single_it;
+            set(T3_P1_it_count,'String',strcat( num2str(independent_optimiazation_cicles(P.isshown.id)),' so far'));
 
 
             %B_start_model();
@@ -3663,69 +4650,73 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         if( get(T3_P1_inv,'Value') == 0 )
             Show_bestmodels_family( hAx_1dprof );
         else
-            draw_1d_profile(hAx_1dprof, vfst_MDLS{data_1d_to_show},'b',1);
-            draw_1d_profile(hAx_1dprof,      MDLS{data_1d_to_show},'k',1);    
+            draw_1d_profile(hAx_1dprof, vfst_MDLS{P.isshown.id},'b',1);
+            draw_1d_profile(hAx_1dprof,      MDLS{P.isshown.id},'k',1);    
         end
     end
+
 %% TAB-4: =================================================
     function BT_refresh_modelview(~,~,~)
         refresh_models_list2D();
         if(get(hwi23D,'Value') == 1)
-            plot_3d(h_gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
         end
         if(get(hwi23D,'Value') == 2)
-            plot_2d_profile( h_gui,  hAx_2Dprof,property_23d_to_show);
+            plot_2d_profile( H.gui,  hAx_2Dprof,property_23d_to_show);
         end
     end
     function BT_show_media(~,~,parameter_id)
         property_23d_to_show = parameter_id;
+        %
+        refresh_models_list2D();
+        %
         if(get(hwi23D,'Value') == 1)
-            plot_3d(h_gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
         end
         if(get(hwi23D,'Value') == 2)
-            plot_2d_profile( h_gui,  hAx_2Dprof,property_23d_to_show);
+            plot_2d_profile( H.gui,  hAx_2Dprof,property_23d_to_show);
         end
     end
     function Slider0_Callback(hObject, eventdata, handles)%             x-
         slider_value = get(hObject,'Value');
         cutplanes(1) =  slider_value;% x- x+ y- y+ z- z+
         if(get(hwi23D,'Value') == 1)
-            plot_3d(h_gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
         end
     end
     function Slider0b_Callback(hObject, eventdata, handles)%            x+
         slider_value = get(hObject,'Value');
         cutplanes(2) =  slider_value;% x- x+ y- y+ z- z+
         if(get(hwi23D,'Value') == 1)
-            plot_3d(h_gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
         end
     end
     function Slider1_Callback(hObject, eventdata, handles)%             y-
         slider_value = get(hObject,'Value');
         cutplanes(3) =  slider_value;% x- x+ y- y+ z- z+
         if(get(hwi23D,'Value') == 1)
-            plot_3d(h_gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
         end
     end
     function Slider1b_Callback(hObject, eventdata, handles)%            y+
         slider_value = get(hObject,'Value');
         cutplanes(4) =  slider_value;% x- x+ y- y+ z- z+
         if(get(hwi23D,'Value') == 1)
-            plot_3d(h_gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
         end
     end
     function Slider2_Callback(hObject, eventdata, handles)%             z-
         slider_value = get(hObject,'Value');
         cutplanes(5) =  slider_value;% x- x+ y- y+ z- z+
         if(get(hwi23D,'Value') == 1)
-            plot_3d(h_gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
         end
     end
     function Slider2b_Callback(hObject, eventdata, handles)%            z+
         slider_value = get(hObject,'Value');
         cutplanes(6) =  slider_value;% x- x+ y- y+ z- z+
         if(get(hwi23D,'Value') == 1)
-            plot_3d(h_gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
         end
     end
     function ResetSlices_Callback(hObject, eventdata, handles)
@@ -3735,10 +4726,10 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         %isslice = dim;
         cutplanes = [0 1 0 1 0 1];
         if(get(hwi23D,'Value') == 1)
-            plot_3d(h_gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
         end
         if(get(hwi23D,'Value') == 2)
-            plot_2d_profile( h_gui,  hAx_2Dprof,property_23d_to_show);
+            plot_2d_profile( H.gui,  hAx_2Dprof,property_23d_to_show);
         end
     end
 
@@ -3846,8 +4837,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 
                 if(~isempty(S))
                     %set(hfig,'CurrentAxes',hax);
-                    %set(h_gui,'CurrentAxes',hAx_1d_confidence);
-                    confidence_plot(h_gui,hAx_1d_confidence, S,poten, X1,X2, var1,var2, vala,valb, nlaya,nlayb);
+                    %set(H.gui,'CurrentAxes',hAx_1d_confidence);
+                    confidence_plot(H.gui,hAx_1d_confidence, S,poten, X1,X2, var1,var2, vala,valb, nlaya,nlayb);
                 end
             end
         end
@@ -3967,7 +4958,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             for ii=1:size(SN_dtamsf,2)
                 SN_dtamsf(:,ii) = SN_dtamsf(:,ii)/max(abs(SN_dtamsf(:,ii)));
             end
-            sensitivity_plot(h_gui,hAx_sensitivity);   
+            sensitivity_plot(H.gui,hAx_sensitivity);   
         end
     end
 
@@ -4129,9 +5120,9 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         STORED_2d_qs_fits = cell(1,Nsurveys);
         STORED_2d_daf_fits= cell(1,Nsurveys);
         %% results list
-        BEST_SINGLE_MISFIT = cell(Nsurveys);%{data_1d_to_show}(id) = Single_Misfit;
-        for m = 1:Nsurveys; BEST_SINGLE_MISFIT{m} = realmax()*ones(NresultsToKeep,1); end%{data_1d_to_show}(id) = Single_Misfit;
-        BEST_SINGLE_MODELS = cell(NresultsToKeep,Nsurveys);%{id,data_1d_to_show}  = last_single_MDLS;
+        BEST_SINGLE_MISFIT = cell(Nsurveys);%{P.isshown.id}(id) = Single_Misfit;
+        for m = 1:Nsurveys; BEST_SINGLE_MISFIT{m} = realmax()*ones(NresultsToKeep,1); end%{P.isshown.id}(id) = Single_Misfit;
+        BEST_SINGLE_MODELS = cell(NresultsToKeep,Nsurveys);%{id,P.isshown.id}  = last_single_MDLS;
         Misfit_vs_Iter = cell(Nsurveys + 1);
         for m = 1:Nsurveys; Misfit_vs_Iter{m} = []; end
     end
@@ -4186,19 +5177,29 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 %         end
     end
     function Update_survey_locations(hhdl)
-        if(hhdl==hAx_geo)
-            set(h_gui,'CurrentAxes',hhdl);
+        if nargin>0
+            if (hhdl==hAx_main_geo) || (hhdl==hAx_geo) 
+                set(H.gui,'CurrentAxes',hhdl);
+                hold(hhdl,'off')
+                cla(hhdl)
+            end
+        else
+            figure('name','Survey geometry');
+            hhdl  = gca; 
         end
-        hold(hhdl,'off')
-        if(~isempty(profile_line))
-            plot(hhdl, profile_line(:,1), profile_line(:,2),'r','linewidth',2); hold(hhdl,'on')
-        end
+        axes(hhdl)
+        hold(hhdl,'on')
+%         if(hhdl==hAx_main_geo) || (hhdl==hAx_geo)
+%             set(H.gui,'CurrentAxes',hhdl);
+%         end
+%         hold(hhdl,'off')
+        %
+        Nhv = size(SURVEYS,1);
+        XY= zeros(Nhv,2);
+        for ri = 1:Nhv; XY(ri,1:2) = SURVEYS{ri,1}(1:2); end
         
-        N = size(SURVEYS,1);
-        XY= zeros(N,2);
-        for ri = 1:N; XY(ri,1:2) = SURVEYS{ri,1}(1:2); end
-        
-        for p = 1:N
+        %% plot measuremet locations
+        for p = 1:Nhv
             colr = [0 0 0];
             if TO_INVERT(p) == 0;  colr = [1.0 0.0 0.0];  end% not to be used in inversion
             if TO_INVERT(p) == 2;  colr = [0.0 1.0 0.0];  end% LOCKED: not modify during inversion
@@ -4207,12 +5208,43 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             hold(hhdl,'on')
             text(XY(p,1), XY(p,2)+0.1, strcat('R',num2str(p)),'HorizontalAlignment','left');
         end
-        
-        if (data_1d_to_show > 0)
-            plot(hhdl, XY(data_1d_to_show,1),XY(data_1d_to_show,2),'or', 'markersize',15);
+        %% plot selected data
+        if (P.isshown.id > 0)
+            plot(hhdl, XY(P.isshown.id,1),XY(P.isshown.id,2),'or', 'markersize',15);
             hold(hhdl,'on')
-            if(hhdl==hAx_geo); set(T3_P1_txt,'String',SURVEYS{data_1d_to_show,2}); end
+            if(hhdl==hAx_main_geo)
+                set(T1_PC_dataid_txt,   'String', num2str(P.isshown.id)   );
+                set(T1_PC_datafile_txt, 'String', SURVEYS{P.isshown.id,2} );
+                set(T1_PC_modelfile_txt,'String', MODELS{P.isshown.id,1} );
+                %
+                % profiles
+                if isempty(P.profile_ids)
+                    Prf_avail='0';
+                    Prf_active='0';
+                else
+                    Prf_avail  = num2str( size(P.profile_ids,1) );
+                    Prf_active = num2str( P.profile.id );
+                end
+                set(T1_PC_n_of_profiles_txt,  'String', Prf_avail);
+                set(T1_PC_active_profiles_txt,'String', Prf_active );
+            end
+            if(hhdl==hAx_geo); set(T3_P1_txt,'String',SURVEYS{P.isshown.id,2}); end
+            
         end
+        %% subset profile
+        if(~isempty(P.profile_line))
+            for ii=1:size(P.profile_line,1)
+                if(~isempty(P.profile_line{ii,1}))
+                    plot(hhdl, P.profile_line{ii,1}(:,1), P.profile_line{ii,1}(:,2),'r','linewidth',2); hold(hhdl,'on')
+                    if strcmp(P.profile_name{ii,1},'none')
+                        text(P.profile_line{ii,1}(end,1), P.profile_line{ii,1}(end,2),strcat('Prof.',num2str(ii))); hold(hhdl,'on')
+                    else
+                        text(P.profile_line{ii,1}(end,1), P.profile_line{ii,1}(end,2),strcat('(',num2str(ii),') ',P.profile_name{ii,1})); hold(hhdl,'on')
+                    end
+                end
+            end
+        end
+        drawnow
        
         hold(hhdl,'on')
         xlim(hhdl, [min(XY(:,1))-1, max(XY(:,1))+1]);
@@ -4234,6 +5266,72 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         end
         drawnow
     end
+    function Update_profile_locations(hhdl)
+        if nargin>0
+            if (hhdl==hAx_main_geo)
+                set(H.gui,'CurrentAxes',hhdl);
+                hold(hhdl,'off')
+                cla(hhdl)
+            end
+        else
+            figure('name','Survey geometry');
+            hhdl  = gca; 
+            %get(h_fig,'CurrentAxes');
+        end
+        hold(hhdl,'on')
+        %
+        Nhv = size(SURVEYS,1);
+        XY= zeros(Nhv,2);
+        for ri = 1:Nhv; XY(ri,1:2) = SURVEYS{ri,1}(1:2); end
+        
+        hold(hhdl,'on')
+        %% plot measuremet locations (color depending on profile)
+        for p = 1:Nhv% show
+            colr = [0 0 0];
+            if ~isempty(P.profile_onoff{P.profile.id,1})
+                if P.profile_onoff{P.profile.id,1}(p) == 1;  colr = [0.0 1.0 0.0];  end% Point is included in the profile
+            end
+            plot(XY(p,1), XY(p,2), 'marker','o','Color',colr,'markerfacecolor',colr,'markersize',8);
+            hold(hhdl,'on')
+            text(XY(p,1), XY(p,2), strcat(' R',num2str(p)),'HorizontalAlignment','left');
+        end
+        %% subset profile
+        %plot(hhdl, P.profile_line{P.profile.id,1}(:,1), P.profile_line{P.profile.id,1}(:,2),'r','linewidth',2); hold(hhdl,'on')
+        %text(P.profile_line{P.profile.id,1}(end,1), P.profile_line{P.profile.id,1}(end,2),strcat('Prof.',num2str(P.profile.id))); hold(hhdl,'on')
+        if(~isempty(P.profile_line))
+            for ii=1:size(P.profile_line,1)
+                colr = 'k';
+                linw = 1;
+                if(~isempty(P.profile_line{ii,1}))
+                    if ii==P.profile.id
+                        colr = 'r';
+                        linw = 2;
+                    end
+                    plot(hhdl, P.profile_line{ii,1}(:,1), P.profile_line{ii,1}(:,2),colr,'linewidth',linw); hold(hhdl,'on')
+                    if strcmp(P.profile_name{ii,1},'none')
+                        text(P.profile_line{ii,1}(end,1), P.profile_line{ii,1}(end,2),strcat('Prof.',num2str(ii))); hold(hhdl,'on')
+                    else
+                        text(P.profile_line{ii,1}(end,1), P.profile_line{ii,1}(end,2),strcat('(',num2str(ii),') ',P.profile_name{ii,1})); hold(hhdl,'on')
+                    end
+                end
+            end
+        end
+       
+        % info profiles
+        if isempty(P.profile_ids)
+            Prf_avail='0';
+            Prf_active='0';
+        else
+            Prf_avail  = num2str( size(P.profile_ids,1) );
+            Prf_active = num2str( P.profile.id );
+        end
+        set(T1_PC_n_of_profiles_txt,  'String', Prf_avail);
+        set(T1_PC_active_profiles_txt,'String', Prf_active );
+        %
+        drawnow
+    end
+
+
     function Update_confidence_view_x()
         idx = conf_1d_to_show_x;
         set(T5_P1_txtx,'String',SURVEYS{idx,2});
@@ -4360,17 +5458,18 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     end
     
     function Show_survey(hhdl)
-        if (0 < data_1d_to_show) && (data_1d_to_show <= length(TO_INVERT))
+        if (0 < P.isshown.id) && (P.isshown.id <= length(TO_INVERT))
 %             if(hhdl==hAx_dat)
 %                 Update_survey_locations(hAx_geo)
-                set(h_gui,'CurrentAxes',hAx_dat);
+%Update_survey_locations(hAx_main_geo);
+                set(H.gui,'CurrentAxes',hAx_dat);
 %             end
             hold(hhdl,'off')
             %% show original data
             cc = 2;% column containing the curve 
-            scale   = FDAT{data_1d_to_show,1}();
+            scale   = FDAT{P.isshown.id,1}();
             lgnd = '     data';
-            show_data = abs( FDAT{data_1d_to_show,2} );
+            show_data = abs( FDAT{P.isshown.id,2} );
             if( curve_plotmode == 0)
                 plot(hhdl, scale, show_data,'k','linewidth',2);
             else
@@ -4386,7 +5485,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                     if(size(modl_FDAT,2)>2)
                         if(~isempty(modl_FDAT{1,3}))
                             %% P-amp
-                            show_curve = abs( modl_FDAT{data_1d_to_show,3}(ixmin_id:ixmax_id) );
+                            show_curve = abs( modl_FDAT{P.isshown.id,3}(ixmin_id:ixmax_id) );
                             if(max(show_curve) >= min(show_curve))
                                 lgnd = [lgnd; 'P-amplif.'];
                                 if( curve_plotmode == 0)
@@ -4398,7 +5497,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                         end
                         if(~isempty(modl_FDAT{1,4}))
                             %% S-amp
-                            show_curve = abs( modl_FDAT{data_1d_to_show,4}(ixmin_id:ixmax_id) );
+                            show_curve = abs( modl_FDAT{P.isshown.id,4}(ixmin_id:ixmax_id) );
                             if(max(show_curve) >= min(show_curve))
                                 lgnd = [lgnd; 'S-amplif.'];
                                 if( curve_plotmode == 0)
@@ -4412,7 +5511,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                     if(~isempty(modl_FDAT{1,2}))
                         %% HVSR model
                         lgnd = [lgnd; 'model-P/S'];
-                        show_curve = abs( modl_FDAT{data_1d_to_show,2}(ixmin_id:ixmax_id) );
+                        show_curve = abs( modl_FDAT{P.isshown.id,2}(ixmin_id:ixmax_id) );
                         if(max(show_curve) ~= min(show_curve))
                             if( curve_plotmode == 0)
                                 plot(hhdl, xvec, show_curve,'g','linewidth',2);
@@ -4427,8 +5526,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                     if(~isempty(modl_FDATSW{1,2}))
                         %% HVSR model
                         lgnd = [lgnd; ' model-SW'];
-                        show_xvec  = modl_FDATSW{data_1d_to_show,1};% (ixmin_id:ixmax_id) );
-                        show_curve = abs( modl_FDATSW{data_1d_to_show,2} );% (ixmin_id:ixmax_id) );
+                        show_xvec  = modl_FDATSW{P.isshown.id,1};% (ixmin_id:ixmax_id) );
+                        show_curve = abs( modl_FDATSW{P.isshown.id,2} );% (ixmin_id:ixmax_id) );
                         if(max(show_curve) ~= min(show_curve))
                             if( curve_plotmode == 0)
                                 plot(hhdl, show_xvec, show_curve,'y','linewidth',2);
@@ -4456,8 +5555,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 end
                 %% show best sinthetic data
                 if(~isempty(best_FDAT))
-                    if(~isempty(best_FDAT{data_1d_to_show,cc}))
-                        show_curve = abs( best_FDAT{data_1d_to_show,cc}(ixmin_id:ixmax_id) );
+                    if(~isempty(best_FDAT{P.isshown.id,cc}))
+                        show_curve = abs( best_FDAT{P.isshown.id,cc}(ixmin_id:ixmax_id) );
                         if(max(show_curve) ~= min(show_curve))
                             lgnd = [lgnd; 'best modl'];
                             %semilogx(hhdl, xvec, show_curve,'r','linewidth',2);
@@ -4471,8 +5570,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 end
                 %% show last runned sinthetic data
                 if(~isempty(last_FDAT))
-                    if(~isempty(last_FDAT{data_1d_to_show,cc}))
-                        show_curve = abs( last_FDAT{data_1d_to_show,cc}(ixmin_id:ixmax_id) );
+                    if(~isempty(last_FDAT{P.isshown.id,cc}))
+                        show_curve = abs( last_FDAT{P.isshown.id,cc}(ixmin_id:ixmax_id) );
                         if(max(show_curve) ~= min(show_curve))
                             %semilogx(hhdl, xvec, show_curve,'b','linewidth',2);
                             lgnd = [lgnd; ' last run'];
@@ -4487,18 +5586,18 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             end
             %% show Uncertainity
             
-            if(~isempty(FDAT{data_1d_to_show,3}))
+            if(~isempty(FDAT{P.isshown.id,3}))
                 lgnd = [lgnd; '    error'];
                 if( curve_plotmode == 0)
-                    plot(hhdl, scale, show_data+FDAT{data_1d_to_show,3},'linewidth',0.5,'color',[0.3 0.3 0.3]);
+                    plot(hhdl, scale, show_data+FDAT{P.isshown.id,3},'linewidth',0.5,'color',[0.3 0.3 0.3]);
                 else
-                    semilogx(hhdl, scale, show_data+FDAT{data_1d_to_show,3},'linewidth',0.5,'color',[0.3 0.3 0.3]);
+                    semilogx(hhdl, scale, show_data+FDAT{P.isshown.id,3},'linewidth',0.5,'color',[0.3 0.3 0.3]);
                 end
                 legend(lgnd);
                 if( curve_plotmode == 0)
-                    plot(hhdl, scale, show_data-FDAT{data_1d_to_show,3},'linewidth',0.5,'color',[0.3 0.3 0.3]);
+                    plot(hhdl, scale, show_data-FDAT{P.isshown.id,3},'linewidth',0.5,'color',[0.3 0.3 0.3]);
                 else
-                    semilogx(hhdl, scale, show_data-FDAT{data_1d_to_show,3},'linewidth',0.5,'color',[0.3 0.3 0.3]);
+                    semilogx(hhdl, scale, show_data-FDAT{P.isshown.id,3},'linewidth',0.5,'color',[0.3 0.3 0.3]);
                 end
             else
                 legend(lgnd);
@@ -4508,37 +5607,40 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             ylabel(hhdl,'HVSR')
             
             xlim(hhdl,[view_min_scale,view_max_scale])
-            DL = modeldepths(data_1d_to_show);
+            DL = modeldepths(P.isshown.id);
             DL(end) = Inf;
-            tabledata = [ MDLS{data_1d_to_show}, DL(2:end)];
-            if(hhdl==hAx_dat); set(hTab_mod,'Data',tabledata); end
+            tabledata = [ MDLS{P.isshown.id}, DL(2:end)];
+            if(hhdl==hAx_dat)
+                %set(hTab_mod,'ColumnEditable', logical(zeros(1,size(tabledata,2))) )
+                set(hTab_mod,'Data',tabledata);%% FIX  this does not show
+            end
             grid on
             drawnow
         end
     end
     function Show_bestmodels_family(hhdl)
-        if(hhdl==hAx_1dprof); set(h_gui,'CurrentAxes',hAx_1dprof); end
+        if(hhdl==hAx_1dprof); set(H.gui,'CurrentAxes',hAx_1dprof); end
         
         hold(hhdl,'off')
         linecol = [0.7, 0.7, 0.7];
         linew   = 0.5;
         for ii = 1:NresultsToKeep
-            TMDL = BEST_SINGLE_MODELS{ii,data_1d_to_show};
+            TMDL = BEST_SINGLE_MODELS{ii,P.isshown.id};
             draw_1d_profile(hhdl, TMDL,linecol,linew);
         end
         
         if(not(isempty(vfst_MDLS)))
             linecol = 'b';
             linew   = 2;
-            draw_1d_profile(hhdl, vfst_MDLS{data_1d_to_show}, linecol,linew);
+            draw_1d_profile(hhdl, vfst_MDLS{P.isshown.id}, linecol,linew);
         end
         linecol = 'r';
         linew   = 2;
-        draw_1d_profile(hhdl, MDLS{data_1d_to_show}, linecol,linew);
+        draw_1d_profile(hhdl, MDLS{P.isshown.id}, linecol,linew);
     end
     function plot__curve_weights(hhdl)
         if(hhdl==hAx_cwf)
-            set(h_gui,'CurrentAxes',hhdl);
+            set(H.gui,'CurrentAxes',hhdl);
         end
         if(curve_weights_plotmode == 0)
             plot(hhdl, weight_curv(:,1), weight_curv(:,2), 'k', 'linewidth',2);
@@ -4554,7 +5656,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         drawnow;
     end
     function plot__depth_weights()
-        set(h_gui,'CurrentAxes',hAx_dwf);
+        set(H.gui,'CurrentAxes',hAx_dwf);
         if(depth_weights_plotmode == 0)
             plot(hAx_dwf, weight_dpth(:,1), weight_dpth(:,2), 'k', 'linewidth',2);
         else
@@ -4612,7 +5714,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             end
         end
     end
-    
+    %
     function [OUT] = multiple_fwd_model()
 %         %get curve x-ranges ids
 %         xmin = str2double( get(h_scale_min,'String') );
@@ -4760,41 +5862,41 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         main_h = 0.8 * DSP(4);
 
         hdiag = figure('name','Model Manager','Visible','on','OuterPosition',[main_l, main_b, main_w, main_h],'NumberTitle','off');
-        P0 = uipanel(hdiag,'FontSize',fontsizeis,'Position',[ 0,   0, 0.2, 1]); 
-        P1 = uipanel(hdiag,'FontSize',fontsizeis,'Position',[ 0.2, 0, 0.4, 1]);
-        P2 = uipanel(hdiag,'FontSize',fontsizeis,'Position',[ 0.6, 0, 0.4, 1]);
+        P0 = uipanel(hdiag,'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[ 0,   0, 0.2, 1]); 
+        P1 = uipanel(hdiag,'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[ 0.2, 0, 0.4, 1]);
+        P2 = uipanel(hdiag,'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[ 0.6, 0, 0.4, 1]);
 
         uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Quit','Position',[0., 0.69, 1, 0.03], ...
-            'FontSize',fontsizeis,'Callback',{@B_quit});
+            'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_quit});
         uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Revert','Position',[0., 0.66, 1, 0.03], ...
-            'FontSize',fontsizeis,'Callback',{@B_revert});
+            'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_revert});
         uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Save and exit','Position',[0., 0.6, 1, 0.03], ...
-            'FontSize',fontsizeis,'Callback',{@B_save});
+            'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_save});
         hbut_bw = uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Test correction (P/S)','Position',[0., 0.5, 1, 0.03]', ...
-            'FontSize',fontsizeis,'Callback',{@B_test_BW});
+            'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_test_BW});
         hbut_sw = uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Test correction (SW)','Position',[0., 0.46, 1, 0.03]', ...
             'Enable',FLAG__PC_features, ...
-            'FontSize',fontsizeis,'Callback',{@B_test_SW});
+            'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_test_SW});
         
         uicontrol('Parent',P0,'Style','text','Units','normalized','String','Misfit (to minimize)','Position',[0., 0.23,  1.0, 0.03], ...
-            'FontSize',fontsizeis);
+            'FontSize',USER_PREFERENCE_interface_objects_fontsize);
         uicontrol('Parent',P0,'Style','text','Units','normalized','String','Before','Position',[0., 0.2,  0.4, 0.03], ...
-            'FontSize',fontsizeis);
+            'FontSize',USER_PREFERENCE_interface_objects_fontsize);
         holdmisf = uicontrol('Parent',P0,'Style','text','Units','normalized','String','0','Position',[0.4, 0.2,  0.6, 0.03], ...
-            'FontSize',fontsizeis);
+            'FontSize',USER_PREFERENCE_interface_objects_fontsize);
         uicontrol('Parent',P0,'Style','text','Units','normalized','String','After','Position',[0., 0.17,  0.4, 0.03], ...
-            'FontSize',fontsizeis);
+            'FontSize',USER_PREFERENCE_interface_objects_fontsize);
         hnewmisf = uicontrol('Parent',P0,'Style','text','Units','normalized','String','0','Position',[0.4, 0.17, 0.6, 0.03], ...
-            'FontSize',fontsizeis);
+            'FontSize',USER_PREFERENCE_interface_objects_fontsize);
         
         cnames = {'Vp','Vs','Ro','H','Qp','Qs'};
         TB = uitable('Parent',P1,'ColumnName',cnames,'Units','normalized','Position',[0.0 0.0 1 1], ...
-            'FontSize',fontsizeis,'ColumnFormat',{'bank','bank','bank','bank','bank','bank'}, ...
+            'FontSize',USER_PREFERENCE_interface_objects_fontsize,'ColumnFormat',{'bank','bank','bank','bank','bank','bank'}, ...
             'ColumnWidth',{75 75 50 50 50 50}); 
         set(TB, 'ColumnEditable',logical([1 1 1 1 1 1 0]))
         set(TB,'Data',newdata);
         
-        hAx_mm= axes('Parent',P2,'Units', 'normalized','Units','normalized','FontSize',fontsizeis,'Position', [0.1 0.1 0.8 0.8]);
+        hAx_mm= axes('Parent',P2,'Units', 'normalized','Units','normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position', [0.1 0.1 0.8 0.8]);
         %% get original misfit
         xmin = str2double( get(h_scale_min,'String') );
         xmax = str2double( get(h_scale_max,'String') );
@@ -4805,7 +5907,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         MDL = get(TB,'Data');
         MDL = MDL(:,1:6);
         OUT1 = single_fwd_model(MDL,x_vec);
-        [oMFit,~,~,~] = get_single_model_misfit(data_1d_to_show, OUT1{2});
+        [oMFit,~,~,~] = get_single_model_misfit(P.isshown.id, OUT1{2});
         set(holdmisf,'String',num2str(oMFit));
         
         %% draw    
@@ -4832,12 +5934,12 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             MDL = get(TB,'Data');
             MDL = MDL(:,1:6);
             OUT1 = single_fwd_model(MDL,x_vec);
-            [tMFit,~, ~, ~] = get_single_model_misfit(data_1d_to_show, OUT1{2});
-            MDLS{data_1d_to_show}    = MDL;
+            [tMFit,~, ~, ~] = get_single_model_misfit(P.isshown.id, OUT1{2});
+            MDLS{P.isshown.id}    = MDL;
             
-            last_MDLS{data_1d_to_show} = MDL;
-            last_FDAT{data_1d_to_show,1} = OUT1{1,1};
-            last_FDAT{data_1d_to_show,2} = OUT1{1,2};
+            last_MDLS{P.isshown.id} = MDL;
+            last_FDAT{P.isshown.id,1} = OUT1{1,1};
+            last_FDAT{P.isshown.id,2} = OUT1{1,2};
             
             last_single_MDL  = MDL;
             last_single_FDAT{1,1} = OUT1{1,1};
@@ -4867,7 +5969,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             MDL = get(TB,'Data');
             MDL = MDL(:,1:6);
             OUT1 = single_fwd_model(MDL,x_vec);
-            [tMFit,~,~,~] = get_single_model_misfit(data_1d_to_show, OUT1{2});
+            [tMFit,~,~,~] = get_single_model_misfit(P.isshown.id, OUT1{2});
             set(hnewmisf,'String',num2str(tMFit));
             
             subredrow();
@@ -4889,7 +5991,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             MDL = get(TB,'Data');
             MDL = MDL(:,1:6);
             OUT1 = single_fwd_model_SW(MDL);
-            [tMFit,~,~,~] = get_single_model_misfit(data_1d_to_show, OUT1{2});
+            [tMFit,~,~,~] = get_single_model_misfit(P.isshown.id, OUT1{2});
             set(hnewmisf,'String',num2str(tMFit));
             
             subredrow();
@@ -4903,8 +6005,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             %% show original data
             hold(hAx_mm,'off')
             cc = 2;% column containing the curve 
-            scale   = FDAT{data_1d_to_show,1}();
-            show_data = abs( FDAT{data_1d_to_show,2} );
+            scale   = FDAT{P.isshown.id,1}();
+            show_data = abs( FDAT{P.isshown.id,2} );
             lgnd = 'data';
             semilogx(hAx_mm, scale, show_data,'k','linewidth',2);
             
@@ -4919,8 +6021,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 xvec = main_scale(ixmin_id:ixmax_id);
                 %% show best sinthetic data
                 if(~isempty(best_FDAT))
-                    if(~isempty(best_FDAT{data_1d_to_show,cc}))
-                        show_curve = abs( best_FDAT{data_1d_to_show,cc}(ixmin_id:ixmax_id) );
+                    if(~isempty(best_FDAT{P.isshown.id,cc}))
+                        show_curve = abs( best_FDAT{P.isshown.id,cc}(ixmin_id:ixmax_id) );
                         if(max(show_curve) ~= min(show_curve))
                             lgnd = [lgnd; 'best'];
                             semilogx(hAx_mm, xvec, show_curve,'r','linewidth',2);
@@ -4957,23 +6059,23 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             drawnow
             
             %% show Uncertainity
-            if(~isempty(FDAT{data_1d_to_show,3}))
+            if(~isempty(FDAT{P.isshown.id,3}))
                 lgnd = [lgnd; 'err.'];
 %                 if( curve_plotmode == 0)
-                    semilogx(hAx_mm, scale, show_data+FDAT{data_1d_to_show,3},'linewidth',0.5,'color',[0.5 0.5 0.5]);
+                    semilogx(hAx_mm, scale, show_data+FDAT{P.isshown.id,3},'linewidth',0.5,'color',[0.5 0.5 0.5]);
                     
 %                 else
-%                     semilogx(hAx_dat, scale, show_curve+FDAT{data_1d_to_show,3},'linewidth',0.5,'color',[0.5 0.5 0.5]);
-%                     semilogx(hAx_dat, scale, show_curve-FDAT{data_1d_to_show,3},'linewidth',0.5,'color',[0.5 0.5 0.5]);
+%                     semilogx(hAx_dat, scale, show_curve+FDAT{P.isshown.id,3},'linewidth',0.5,'color',[0.5 0.5 0.5]);
+%                     semilogx(hAx_dat, scale, show_curve-FDAT{P.isshown.id,3},'linewidth',0.5,'color',[0.5 0.5 0.5]);
 %                 end
             end
             legend(lgnd)
-            if(~isempty(FDAT{data_1d_to_show,3}))
+            if(~isempty(FDAT{P.isshown.id,3}))
 %                 if( curve_plotmode == 0)
-                    semilogx(hAx_mm, scale, show_data-FDAT{data_1d_to_show,3},'linewidth',0.5,'color',[0.5 0.5 0.5]);
+                    semilogx(hAx_mm, scale, show_data-FDAT{P.isshown.id,3},'linewidth',0.5,'color',[0.5 0.5 0.5]);
 %                 else
-%                     semilogx(hAx_dat, scale, show_curve+FDAT{data_1d_to_show,3},'linewidth',0.5,'color',[0.5 0.5 0.5]);
-%                     semilogx(hAx_dat, scale, show_curve-FDAT{data_1d_to_show,3},'linewidth',0.5,'color',[0.5 0.5 0.5]);
+%                     semilogx(hAx_dat, scale, show_curve+FDAT{P.isshown.id,3},'linewidth',0.5,'color',[0.5 0.5 0.5]);
+%                     semilogx(hAx_dat, scale, show_curve-FDAT{P.isshown.id,3},'linewidth',0.5,'color',[0.5 0.5 0.5]);
 %                 end
             end
             
@@ -4991,53 +6093,53 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 
         hdiag = figure('name','Lock Parameters','Visible','on','OuterPosition',[main_l, main_b, main_w, main_h],'NumberTitle','off');
         set(hdiag,'MenuBar','none');
-        P0 = uipanel(hdiag,'FontSize',fontsizeis,'Position',[ 0, 0, 0.4, 1]);
-        P1 = uipanel(hdiag,'FontSize',fontsizeis,'Position',[ 0.4, 0, 0.6, 1]);
+        P0 = uipanel(hdiag,'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[ 0, 0, 0.4, 1]);
+        P1 = uipanel(hdiag,'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[ 0.4, 0, 0.6, 1]);
         
         
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Lock Vp',  'Position',[0.0, 0.97, 0.5, 0.03],'FontSize',fontsizeis,'Callback',{@B_lock,  1});
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Unlock Vp','Position',[0.5, 0.97, 0.5, 0.03],'FontSize',fontsizeis,'Callback',{@B_unlock,1});
+        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Lock Vp',  'Position',[0.0, 0.97, 0.5, 0.03],'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_lock,  1});
+        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Unlock Vp','Position',[0.5, 0.97, 0.5, 0.03],'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_unlock,1});
         
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Lock Vs',  'Position',[0.0, 0.94, 0.5, 0.03],'FontSize',fontsizeis,'Callback',{@B_lock,  2});
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Unlock Vs','Position',[0.5, 0.94, 0.5, 0.03],'FontSize',fontsizeis,'Callback',{@B_unlock,2});
+        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Lock Vs',  'Position',[0.0, 0.94, 0.5, 0.03],'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_lock,  2});
+        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Unlock Vs','Position',[0.5, 0.94, 0.5, 0.03],'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_unlock,2});
         
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Lock Ro',  'Position',[0.0, 0.91, 0.5, 0.03],'FontSize',fontsizeis,'Callback',{@B_lock,  3});
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Unlock Ro','Position',[0.5, 0.91, 0.5, 0.03],'FontSize',fontsizeis,'Callback',{@B_unlock,3});
+        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Lock Ro',  'Position',[0.0, 0.91, 0.5, 0.03],'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_lock,  3});
+        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Unlock Ro','Position',[0.5, 0.91, 0.5, 0.03],'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_unlock,3});
         
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Lock H',   'Position',[0.0, 0.88, 0.5, 0.03],'FontSize',fontsizeis,'Callback',{@B_lock,  4});
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Unlock H', 'Position',[0.5, 0.88, 0.5, 0.03],'FontSize',fontsizeis,'Callback',{@B_unlock,4});
+        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Lock H',   'Position',[0.0, 0.88, 0.5, 0.03],'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_lock,  4});
+        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Unlock H', 'Position',[0.5, 0.88, 0.5, 0.03],'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_unlock,4});
         
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Lock Qp',  'Position',[0.0, 0.85, 0.5, 0.03],'FontSize',fontsizeis,'Callback',{@B_lock,  5});
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Unlock Qp','Position',[0.5, 0.85, 0.5, 0.03],'FontSize',fontsizeis,'Callback',{@B_unlock,5});
+        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Lock Qp',  'Position',[0.0, 0.85, 0.5, 0.03],'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_lock,  5});
+        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Unlock Qp','Position',[0.5, 0.85, 0.5, 0.03],'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_unlock,5});
         
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Lock Qs',  'Position',[0.0, 0.82, 0.5, 0.03],'FontSize',fontsizeis,'Callback',{@B_lock,  6});
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Unlock Qs','Position',[0.5, 0.82, 0.5, 0.03],'FontSize',fontsizeis,'Callback',{@B_unlock,6});
+        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Lock Qs',  'Position',[0.0, 0.82, 0.5, 0.03],'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_lock,  6});
+        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Unlock Qs','Position',[0.5, 0.82, 0.5, 0.03],'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_unlock,6});
         
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Lock Half-space',  'Position',[0.0, 0.76, 0.5, 0.03],'FontSize',fontsizeis,'Callback',{@B_lock,  10});
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Unlock Half-space','Position',[0.5, 0.76, 0.5, 0.03],'FontSize',fontsizeis,'Callback',{@B_unlock,10});
+        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Lock Half-space',  'Position',[0.0, 0.76, 0.5, 0.03],'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_lock,  10});
+        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Unlock Half-space','Position',[0.5, 0.76, 0.5, 0.03],'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_unlock,10});
         
         
         
         uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Quit','Position',[0., 0.69, 1, 0.03], ...
-            'FontSize',fontsizeis,'Callback',{@B_quit});
+            'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_quit});
         uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Revert','Position',[0., 0.66, 1, 0.03], ...
-            'FontSize',fontsizeis,'Callback',{@B_revert});
+            'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_revert});
         uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Save and exit','Position',[0., 0.6, 1, 0.03], ...
-            'FontSize',fontsizeis,'Callback',{@B_save});
+            'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_save});
        
-        uicontrol('FontSize',fontsizeis,'Style','text','parent',P1,'String','Perturbe parameters:','Units','normalized','Position',[0.0, 0.9, 1, 0.1]);
+        uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',P1,'String','Perturbe parameters:','Units','normalized','Position',[0.0, 0.9, 1, 0.1]);
         cnames = {'Vp','Vs','Ro','H','Qp','Qs'};
         columnformat = {'logical', 'logical', 'logical', 'logical', 'logical', 'logical'};
         TB = uitable('Parent',P1,'ColumnName',cnames,'Units','normalized','Position',[0.0 0.5 1 0.4], ...
-            'FontSize',fontsizeis,'ColumnFormat',columnformat , ...
+            'FontSize',USER_PREFERENCE_interface_objects_fontsize,'ColumnFormat',columnformat , ...
             'ColumnWidth','auto','ColumnEditable',logical([1 1 1 1 1 1]));
         set(TB,'Data',logical(newdata));
         
         % relaxes
-        uicontrol('FontSize',fontsizeis,'Style','text','parent',P1,'String','Relax Constrains:','Units','normalized','Position',[0.0, 0.4, 1, 0.1]);
+        uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',P1,'String','Relax Constrains:','Units','normalized','Position',[0.0, 0.4, 1, 0.1]);
         cnames = {'max Vp/Vs'};
         TB_relaxations = uitable('Parent',P1,'ColumnName',cnames,'Units','normalized','Position',[0.0 0.0 1 0.4], ...
-            'FontSize',fontsizeis,'ColumnFormat',columnformat , ...
+            'FontSize',USER_PREFERENCE_interface_objects_fontsize,'ColumnFormat',columnformat , ...
             'ColumnWidth','auto','ColumnEditable',logical([1]));
         set(TB_relaxations,'Data',logical(except));
         
@@ -5118,10 +6220,10 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 %                     % = delta *  (randn(1000000,1)/4) 
 %                     P = (randn(Nlay,6)/4);
 %                 end
-                [P] = get_probability(Nlay);% P = (n-layers, 6 columns)
+                [PRB] = get_probability(Nlay);% PRB = (n-layers, 6 columns)
                 
                 %% perturbed model     
-                [OUTM] = get_perturbed_model(INM,P,pctk, pcvp,pcvs, pcro, pcqp,pcqs,DW{m});%dptW);
+                [OUTM] = get_perturbed_model(INM,PRB,pctk, pcvp,pcvs, pcro, pcqp,pcqs,DW{m});%dptW);
                  
                 %% check for media constrains
                 OUTMS{m} = check_phisical_constrains(OUTM);
@@ -5170,7 +6272,6 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             end
         end
     end
-
     %% Sigle model optimization
     function [OUTM] = perturbe_single_model(INM)
 %%        % MTP: Model To Perturbe
@@ -5178,11 +6279,11 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         [pctk, pcvp,pcvs, pcro, pcqp,pcqs] = get_perturbations();
         
         Nlay = size(INM, 1);
-        dptW = DW{data_1d_to_show};
-        [P] = get_probability(Nlay);
+        dptW = DW{P.isshown.id};
+        [PRB] = get_probability(Nlay);
         
         %% perturbed model
-        OUTM = get_perturbed_model(INM,P,pctk, pcvp,pcvs, pcro, pcqp,pcqs,dptW);
+        OUTM = get_perturbed_model(INM,PRB,pctk, pcvp,pcvs, pcro, pcqp,pcqs,dptW);
         %fprintf('  [A] perturbation [%f][%f][%f][%f][%f][%f]\n', max( abs(OUTM - INM ) ) );
                     
         
@@ -5199,9 +6300,9 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         pcqp = str2double(get(h_qp_val, 'String'))/100;
         pcqs = str2double(get(h_qs_val, 'String'))/100;
     end
-    function [P] = get_probability(Nlay)
+    function [PRB] = get_probability(Nlay)
         if ( get(hRand,'Value') == 1)% Uniform
-            P = (randi(1000, Nlay,6)-500)/500;% [-1 , -1] uniform, dr = 0.001    
+            PRB = (randi(1000, Nlay,6)-500)/500;% [-1 , -1] uniform, dr = 0.001    
         end
         if ( get(hRand,'Value') == 2)% Gaussian
             % gaussian distribution here 
@@ -5211,14 +6312,14 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             %
             %x= (value*variation/100) * (randn(1000000,1)/4);
             % = delta *  (randn(1000000,1)/4) 
-            P = (randn(Nlay,6)./4);
+            PRB = (randn(Nlay,6)./4);
         end
     end
-    function [O] = get_perturbed_model(IN,P,pctk, pcvp,pcvs, pcro, pcqp,pcqs,dptW)
+    function [O] = get_perturbed_model(IN,PP,pctk, pcvp,pcvs, pcro, pcqp,pcqs,dptW)
         nls  = size(IN,1);
-        chng = P.*IN;
+        chng = PP.*IN;
         Mtrix= 0*chng;
-        %dptW = DW{data_1d_to_show};
+        %dptW = DW{PP.isshown.id};
         
         Mtrix(:,1) = dptW .* pcvp .* chng(:,1);% Vp
         Mtrix(:,2) = dptW .* pcvs .* chng(:,2);% Vs
@@ -5297,15 +6398,11 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         weights = (CW{survey_id}).^2;
         weights(DISCARDS{survey_id},:) = 0;
         weights = weights(ixmin_id:ixmax_id);
-        
-        % figure; plot(main_scale, CW{survey_id},'.-b'); pause
-        
+        % figure; plot(main_scale, CW{survey_id},'.-b'); pause        
         %% curve term
         w2 = weights.^2;
         C2 = (sint_curve-data_curve).^2;
-        curveterm = sum(w2.*C2);
-        
-        
+        curveterm = sum(w2.*C2);        
         %% slope term
         DsintDs = sint_curve(2:end)-sint_curve(1:end-1);
         DdataDs = data_curve(2:end)-data_curve(1:end-1);
@@ -5324,37 +6421,37 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     end
     
     function Store_Single_Result(Single_Misfit,MDL,ctrm,strm)
-        the_worst_energy = max(BEST_SINGLE_MISFIT{data_1d_to_show});
-        the_best_energy  = min(BEST_SINGLE_MISFIT{data_1d_to_show});
+        the_worst_energy = max(BEST_SINGLE_MISFIT{P.isshown.id});
+        the_best_energy  = min(BEST_SINGLE_MISFIT{P.isshown.id});
         
         if(Single_Misfit < the_worst_energy)
-            id = find( BEST_SINGLE_MISFIT{data_1d_to_show} == the_worst_energy);%% id of location to replace 
+            id = find( BEST_SINGLE_MISFIT{P.isshown.id} == the_worst_energy);%% id of location to replace 
             id = id(1);
             %fprintf('     >> kept.\n')
-            BEST_SINGLE_MISFIT{data_1d_to_show}(id) = Single_Misfit;
-            BEST_SINGLE_MODELS{id,data_1d_to_show}  = MDL;
+            BEST_SINGLE_MISFIT{P.isshown.id}(id) = Single_Misfit;
+            BEST_SINGLE_MODELS{id,P.isshown.id}  = MDL;
             
             if(Single_Misfit < the_best_energy)
                 %fprintf('     >> new best single-model found.\n')
-                nsofar = size(STORED_RESULTS_1d_misfit{data_1d_to_show}, 1);
-                Misfit_vs_Iter{data_1d_to_show} = [Misfit_vs_Iter{data_1d_to_show}; [nsofar ,Single_Misfit,ctrm, strm] ]; 
+                nsofar = size(STORED_RESULTS_1d_misfit{P.isshown.id}, 1);
+                Misfit_vs_Iter{P.isshown.id} = [Misfit_vs_Iter{P.isshown.id}; [nsofar ,Single_Misfit,ctrm, strm] ]; 
                 %%fprintf('it[%d]-->> %f\n',nsofar,Single_Misfit)
                 
                 nc = length(last_single_FDAT);
-                for j = 1:nc; best_FDAT{data_1d_to_show,j} = last_single_FDAT{j}; end
-                MDLS{data_1d_to_show} = last_single_MDL;
+                for j = 1:nc; best_FDAT{P.isshown.id,j} = last_single_FDAT{j}; end
+                MDLS{P.isshown.id} = last_single_MDL;
                 
                 if(get(h_realtime,  'Value')==0)% update if a new best model is found
                     Show_survey(hAx_dat);
                     hold(hAx_1dprof,'off');
                     if(~isempty(vfst_MDLS))
-                        draw_1d_profile(hAx_1dprof, vfst_MDLS{data_1d_to_show},'b',1);
+                        draw_1d_profile(hAx_1dprof, vfst_MDLS{P.isshown.id},'b',1);
                         hold(hAx_1dprof,'on');
                     end
-                    draw_1d_profile(hAx_1dprof, MDLS{data_1d_to_show},'k',1);
+                    draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
                     hold(hAx_1dprof,'on');
                     %pause
-                    draw_Misfit_vs_it(h_gui, hAx_MvsIT);
+                    draw_Misfit_vs_it(H.gui, hAx_MvsIT);
                 end
                 
             end
@@ -5365,16 +6462,15 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             
             hold(hAx_1dprof,'off');
             if(~isempty(vfst_MDLS))
-                draw_1d_profile(hAx_1dprof, vfst_MDLS{data_1d_to_show},'b',1);
+                draw_1d_profile(hAx_1dprof, vfst_MDLS{P.isshown.id},'b',1);
                 hold(hAx_1dprof,'on');
             end
             
             %plot_1d_profile(hAx_1dprof);
-            draw_1d_profile(hAx_1dprof, MDLS{data_1d_to_show},'k',1);
+            draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
             hold(hAx_1dprof,'on');
         end
     end
-
     %% Graphical
     function [boxx,boxy] = getsquare(xmin,xmax,ymin,ymax)
         % getsquare()
@@ -5514,21 +6610,21 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     function draw_1d_profile(hhdl, TMDL,linecol,linew)
         if(~isempty(TMDL))
             switch(property_1d_to_show)
-                case 1;  P = TMDL(:,1); str = 'Vp (m/s)';
-                case 2;  P = TMDL(:,2); str = 'Vs (m/s)';  
-                case 3;  P = TMDL(:,3); str = 'Ro';
+                case 1;  Pty = TMDL(:,1); str = 'Vp (m/s)';
+                case 2;  Pty = TMDL(:,2); str = 'Vs (m/s)';  
+                case 3;  Pty = TMDL(:,3); str = 'Ro';
                 % -----------------------------------4   id thickness    
-                case 4;  P = TMDL(:,5); str = 'Qp';
-                case 5;  P = TMDL(:,6); str = 'Qs';
+                case 4;  Pty = TMDL(:,5); str = 'Qp';
+                case 5;  Pty = TMDL(:,6); str = 'Qs';
                 %
-                case 6; 
+                case 6 
                     vp = TMDL(:,1);
                     vs = TMDL(:,2);
-                    P = 0.5*(vp.^2 - 2*vs.^2)./(vp.^2 - vs.^2);% Nu
+                    Pty = 0.5*(vp.^2 - 2*vs.^2)./(vp.^2 - vs.^2);% Nu
                     str = 'Poisson Rat.';
-                case 7; P = DW{data_1d_to_show}; str = 'Depth Weigth';% Depth-Weights 
+                case 7; Pty = DW{P.isshown.id}; str = 'Depth Weigth';% Depth-Weights 
                 otherwise
-                    P = TMDL(:,2); str = 'Vs (m/s)'; 
+                    Pty = TMDL(:,2); str = 'Vs (m/s)'; 
             end
             DH = TMDL(:,4);
             
@@ -5541,12 +6637,12 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             end
             DL(nl+1) = -(sum(DH(1:ll))+20); 
             
-            if(hhdl==hAx_1dprof); set(h_gui,'CurrentAxes',hAx_1dprof); end
+            if(hhdl==hAx_1dprof); set(H.gui,'CurrentAxes',hAx_1dprof); end
             for ll=1:nl
-                plot(hhdl,   P(ll)*[1;1],  [DL(ll);DL(ll+1)], 'Color',linecol,'linewidth',linew);
+                plot(hhdl,   Pty(ll)*[1;1],  [DL(ll);DL(ll+1)], 'Color',linecol,'linewidth',linew);
                 hold(hhdl,  'on')
-                if(ll<nl);
-                    plot(hhdl,  [P(ll);P(ll+1)],  DL(ll+1)*([1;1]), 'Color',linecol,'linewidth',linew);
+                if(ll<nl)
+                    plot(hhdl,  [Pty(ll);Pty(ll+1)],  DL(ll+1)*([1;1]), 'Color',linecol,'linewidth',linew);
                 end
             end
             %% User-defined Reference model (as profile)
@@ -5614,21 +6710,21 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 		set(figure_handle,'CurrentAxes',axes_handle);
         hold(axes_handle,'off')      
         if(~isempty(Misfit_vs_Iter))
-            if(~isempty(Misfit_vs_Iter{data_1d_to_show}))
+            if(~isempty(Misfit_vs_Iter{P.isshown.id}))
                 %hold(axes_handle,'on')
-%                 vmax = 0.01*max(Misfit_vs_Iter{data_1d_to_show}(:,2));
-%                 graph = Misfit_vs_Iter{data_1d_to_show}(:,2)./vmax;
-%                 cgraph= Misfit_vs_Iter{data_1d_to_show}(:,3)./vmax;
-%                 sgraph= Misfit_vs_Iter{data_1d_to_show}(:,4)./vmax;
+%                 vmax = 0.01*max(Misfit_vs_Iter{P.isshown.id}(:,2));
+%                 graph = Misfit_vs_Iter{P.isshown.id}(:,2)./vmax;
+%                 cgraph= Misfit_vs_Iter{P.isshown.id}(:,3)./vmax;
+%                 sgraph= Misfit_vs_Iter{P.isshown.id}(:,4)./vmax;
                 %
-                cgraph= Misfit_vs_Iter{data_1d_to_show}(:,3)/max(Misfit_vs_Iter{data_1d_to_show}(:,3));
-                sgraph= Misfit_vs_Iter{data_1d_to_show}(:,4)/max(Misfit_vs_Iter{data_1d_to_show}(:,4));
-                graph  = Misfit_vs_Iter{data_1d_to_show}(:,2)/max(Misfit_vs_Iter{data_1d_to_show}(:,2));
+                cgraph= Misfit_vs_Iter{P.isshown.id}(:,3)/max(Misfit_vs_Iter{P.isshown.id}(:,3));
+                sgraph= Misfit_vs_Iter{P.isshown.id}(:,4)/max(Misfit_vs_Iter{P.isshown.id}(:,4));
+                graph  = Misfit_vs_Iter{P.isshown.id}(:,2)/max(Misfit_vs_Iter{P.isshown.id}(:,2));
                 
-                %cgraph= Misfit_curve_term_w * Misfit_vs_Iter{data_1d_to_show}(:,3)/max(Misfit_vs_Iter{data_1d_to_show}(:,3));
-                %sgraph= Misfit_slope_term_w * Misfit_vs_Iter{data_1d_to_show}(:,4)/max(Misfit_vs_Iter{data_1d_to_show}(:,4));
+                %cgraph= Misfit_curve_term_w * Misfit_vs_Iter{P.isshown.id}(:,3)/max(Misfit_vs_Iter{P.isshown.id}(:,3));
+                %sgraph= Misfit_slope_term_w * Misfit_vs_Iter{P.isshown.id}(:,4)/max(Misfit_vs_Iter{P.isshown.id}(:,4));
                 %
-                xscal = Misfit_vs_Iter{data_1d_to_show}(:,1);
+                xscal = Misfit_vs_Iter{P.isshown.id}(:,1);
                 plot(axes_handle, xscal, graph,'.-k','LineWidth',3,'MarkerSize',5);
                 hold(axes_handle,'on')
                 plot(axes_handle,  xscal, cgraph,'-r','LineWidth',3,'MarkerSize',1);
@@ -5643,15 +6739,34 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             end
         end
     end
-
     %%
     function plot_2d_profile(figure_handle, axes_handle, quantity)
-        if(isempty(profile_ids))
-            Message = ['Profile not yet defined.'];
+        
+        if(isempty(P.profile_ids))
+            Message = ['Profiles not yet defined.'];
             msgbox(Message,'CREDITS:')
             return;
         end
-           
+        if P.profile.id==0; P.profile.id=1; end
+        Pid = P.profile.id;
+        ids = P.profile_ids{Pid,1}(:,1);
+        
+        % prepare elevation points
+        show_terrain = get(h_togg_terrain,'Value');
+        terrain_elevation = 0*P.profile_ids{Pid,1}(:,1);
+        bedrockline = (bedrock(3,ids))';
+        if show_terrain==1
+            for m = 1:size(P.profile_ids{Pid,1},1) 
+                recID = P.profile_ids{Pid,1}(m,1);
+                terrain_elevation(m) =  receiver_locations(recID,3);
+                bedrockline(m) = bedrock(3,recID) + terrain_elevation(m); 
+            end
+        end
+        
+        % prepare profile        
+        Pname = P.profile_name{Pid,1};
+        if strcmp(Pname,'none'); Pname=strcat('profile-',num2str(Pid)); end
+        
 		set(figure_handle,'CurrentAxes',axes_handle);
         hold(axes_handle,'off')
         plot(0,0)
@@ -5660,30 +6775,50 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         %  vp  vs  rho  xhx  Qp  Qs
         if (isempty(ROList) || isempty(VPList) || isempty(QPList) || isempty(VSList) || isempty(QSList)); refresh_models_list2D(); end       
         switch(quantity)
-            case 1; tmp = VPList; str='Vp';
+            case 1; tmp = VPList; str=strcat('Vp in: ',Pname);
             
-            case 3; tmp = ROList; str='RO';
-            case 4; tmp = QPList; str='Qp';
-            case 5; tmp = QSList; str='Qs';
-            otherwise; tmp = VSList; str='Vs'; 
+            case 3; tmp = ROList; str=strcat('RO in: ',Pname);
+            case 4; tmp = QPList; str=strcat('Qp in: ',Pname);
+            case 5; tmp = QSList; str=strcat('Qs in: ',Pname);
+            otherwise; tmp = VSList; str=strcat('Vs in: ',Pname); 
         end
 %       
-        ids = profile_ids(:,1);
+        
         tmp = tmp(:, ids);
-        rr = profile_ids(:,2);
-        imagenorm(tmp,  rr, zlevels, nx_ticks,nz_ticks, smoothing_strategy,smoothing_radius);
+        rr = P.profile_ids{Pid,1}(:,2);% profile_ids(:,2);
+        [bottom_Z] = imagenorm(tmp,  rr, zlevels, nx_ticks,nz_ticks, smoothing_strategy,smoothing_radius,  show_terrain,terrain_elevation);
+        
 		axis(axes_handle,'xy')
         hold(axes_handle,'on')
-        plot(axes_handle,  rr,bedrock(3,ids),'o-w','LineWidth',3,'MarkerSize',5);
         
-        for m = 1:size(profile_ids,1) 
-            id = profile_ids(m,1); %1:size(MDLS,2)
-            Z = modeldepths(id);
-            X =  rr(m) * ones(length(Z),1);%SURVEYS{m,1}(1)
-           
-            plot(axes_handle,  X,Z,'ow','LineWidth',3,'MarkerSize',5);
+        %% bedrock mask
+        if get(T5_P1_HsMask,'Value')
+            polygonx = [rr(1); rr; rr(end)];
+            polygony = [bottom_Z; bedrockline; bottom_Z];
+            fill(polygonx ,polygony, [0 0 0])
         end
-        
+        %% layers boundaries
+        if( get(h_togg_2D_layers_boundaries,'Value') )
+            for m = 1:size(P.profile_ids{Pid,1},1) 
+                idp = P.profile_ids{Pid,1}(m,1);%profile_ids(m,1);
+                Z = modeldepths(idp);
+                X =  rr(m) * ones(length(Z),1);
+
+                plot(axes_handle,  X,Z,'ow','LineWidth',3,'MarkerSize',5);
+            end
+        end
+        %% Bedrock line
+        if( get(h_togg_2D_bedrock_line,'Value') )
+            plot(axes_handle,  rr,bedrockline,'o-w','LineWidth',3,'MarkerSize',5);
+        end
+        %% measurement points
+        if( get(h_togg_measpoints,'Value') ) 
+            for m = 1:size(P.profile_ids{Pid,1},1) 
+                recID = P.profile_ids{Pid,1}(m,1);
+                plot(rr(m), terrain_elevation(m),'og','markersize',7,'markerfacecolor','g')
+                text(rr(m), terrain_elevation(m), num2str(recID) )
+            end
+        end   
         title(str);
 	end
     function plot_3d(figure_handle, axes_handle, quantity)
@@ -5721,21 +6856,22 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             plot3(receiver_locations(:,1), receiver_locations(:,2), receiver_locations(:,3),'or');
         end
     end
-    function ViewerPostCallback(obj,evd)
+    function ViewerPostCallback(~,evd)%(obj,evd)
        viewerview= round(get(evd.Axes,'View'));
     end
-
-    function imagenorm( DATI, Xivec,Zjvec, nx,nz, smoothing_strategy,smoothing_radius)
+        
+    function [bottom_Z] = imagenorm( DATI, Xivec,Zjvec, nx,nz, smoothing_strategy,smoothing_radius,  show_terrain,terrain_elevation)% From 4.0.0
         % 
-        % not accounts for elevation
-
+        % Xivec     x-location along the profile
+        % Zjvec     layers, or Z ticks not accounting elevation. (max(Zjvec)  is always 0)
+        %
         %DATI(DATI == 0) = NaN;
-
+        
         [XBef,ZBef] = meshgrid(Xivec,Zjvec);
 
         xmi = min(Xivec);
         xma = max(Xivec);
-        zmi = min(Zjvec);
+        zmi = min(Zjvec); min_z = zmi;
         zma = max(Zjvec);
 
         xi = linspace(xmi, xma, nx);%%  change resolution
@@ -5746,39 +6882,125 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 
         %% smoothing
         [DAft] = prfsmoothing(DAft, smoothing_strategy,smoothing_radius);
-
         
-        %
-        % OLD _____________________________________________________________________
-        % image(xi,zi, DAft,'CDataMapping','scaled');
-        % NEW______________________________________________________________________        
-
-        lines1= linspace( min(min(DAft)), max(max(DAft)), 200 );
-        contourf( xi, zi, DAft, lines1, 'EdgeColor','none'); 
-        hold on
-
-        vmax = max(max(DAft));
-
-        % if( (vmax <= 1000) );                  lines = 100: 100 : 1000; end
-        % if( (1000 < vmax) && (vmax <= 1900) ); lines = 100: 150 : 1900; end
-        % if( (1900 < vmax) && (vmax <= 3100) ); lines = 100: 300 : 3100; end
-        % if( (vmax > 3000) );                   lines = 100: 500 : vmax; end
-        %lines = min(min(DAft)): 100 : max(max(DAft));
-        %[C,h] = contour( xi, zi, DAft, lines,'EdgeColor','k','Fill','off');
-        %clabel(C,h);
-        % _________________________________________________________________________
-
-
-
+        if show_terrain==0
+            % OLD _____________________________________________________________________
+            % image(xi,zi, DAft,'CDataMapping','scaled');
+            % NEW______________________________________________________________________   
+            lines1= linspace( min(min(DAft)), max(max(DAft)), 200 );
+            contourf( xi, zi, DAft, lines1, 'EdgeColor','none'); 
+            hold on
+        end
+        if show_terrain==1
+            % create new matrix
+            new_elevation = interp1(Xivec,terrain_elevation,  xi);
+            elevation_min = min(terrain_elevation);
+            elevation_max = max(terrain_elevation);
+            %
+            max_z = max(zi)+elevation_max;
+            min_z = min(zi)+elevation_min;
+            %dz = 0.5*( abs(zi(2)-zi(1)) );
+            %newz = (min_z:dz:(max_z+dz))';
+            newz = fliplr( linspace(min_z,max_z,nz) );
+            
+            
+            newM = zeros( length(newz), size(DAft,2) ); 
+            for cc = 1:size(DAft,2)
+                oldz = zi + new_elevation(cc);
+                newM(:,cc) = interp1(oldz,DAft(:,cc),  newz);
+            end
+            %% fill empty values
+            for cc = 1:size(newM,2)
+                for rw = 1:size(newM,1)
+                    if ~isnan(newM(rw,cc))
+                        newM(1:rw,cc) = newM(rw,cc);
+                        break;
+                    end
+                end
+                for rw = size(newM,1):-1:1
+                    if ~isnan(newM(rw,cc))
+                        newM(rw:end,cc) = newM(rw,cc);
+                        break;
+                    end
+                end
+            end
+            
+            %% plot image
+            lines1= linspace( min(min(DAft)), max(max(DAft)), 200 );
+            contourf( xi, newz, newM, lines1, 'EdgeColor','none'); 
+            hold on
+            %% mask invalid sections
+            %top
+            polygonx = [Xivec(1); Xivec; Xivec(end)];
+            polygony = [1.1*max_z; terrain_elevation; 1.1*max_z];
+            fill(polygonx ,polygony, [1 1 1])
+            %bottom
+            polygonx = [Xivec(1); Xivec; Xivec(end)];
+            polygony = [(min_z-0.1); (terrain_elevation-range(Zjvec)); (min_z-0.1)];
+            fill(polygonx ,polygony, [1 1 1])
+            
+        end
         caxis([min(min(DATI)), max(max(DATI))])
-
         % 
         colorbar
         drawnow
-
+        bottom_Z = (min_z-0.1);
     end% function
+%%     function imagenorm( DATI, Xivec,Zjvec, nx,nz, smoothing_strategy,smoothing_radius)     NO ELEVATION V3.0.0
+%         % 
+%         % not accounts for elevation
+%         %
+%         %DATI(DATI == 0) = NaN;
+% 
+%         [XBef,ZBef] = meshgrid(Xivec,Zjvec);
+% 
+%         xmi = min(Xivec);
+%         xma = max(Xivec);
+%         zmi = min(Zjvec);
+%         zma = max(Zjvec);
+% 
+%         xi = linspace(xmi, xma, nx);%%  change resolution
+%         zi = fliplr(linspace(zmi, zma, nz));%%  change resolution
+%         [XAft,ZAft] = meshgrid(xi,zi);
+%         %save debug_imagenorm.mat
+%         DAft = interp2(XBef,ZBef,DATI,  XAft,ZAft);
+% 
+%         %% smoothing
+%         [DAft] = prfsmoothing(DAft, smoothing_strategy,smoothing_radius);
+% 
+%         
+%         %
+%         % OLD _____________________________________________________________________
+%         % image(xi,zi, DAft,'CDataMapping','scaled');
+%         % NEW______________________________________________________________________        
+% 
+%         lines1= linspace( min(min(DAft)), max(max(DAft)), 200 );
+%         contourf( xi, zi, DAft, lines1, 'EdgeColor','none'); 
+%         hold on
+% 
+%         vmax = max(max(DAft));
+% 
+%         % if( (vmax <= 1000) );                  lines = 100: 100 : 1000; end
+%         % if( (1000 < vmax) && (vmax <= 1900) ); lines = 100: 150 : 1900; end
+%         % if( (1900 < vmax) && (vmax <= 3100) ); lines = 100: 300 : 3100; end
+%         % if( (vmax > 3000) );                   lines = 100: 500 : vmax; end
+%         %lines = min(min(DAft)): 100 : max(max(DAft));
+%         %[C,h] = contour( xi, zi, DAft, lines,'EdgeColor','k','Fill','off');
+%         %clabel(C,h);
+%         % _________________________________________________________________________
+% 
+% 
+% 
+%         caxis([min(min(DATI)), max(max(DATI))])
+% 
+%         % 
+%         colorbar
+%         drawnow
+% 
+%     end% function
+%%
     function DL = modeldepths(m)
-        DH = MDLS{m}(:,4);
+        DH = MDLS{1,m}(:,4);
         nlay = size(DH,1);
         DL = zeros(nlay+1,1);
         for ll=1:nlay-1
@@ -5841,26 +7063,26 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     
     function plot_extern(~,~,idx)
         hxten = figure;
-        hAxs= axes('Parent',hxten,'Units', 'normalized','Units','normalized','FontSize',fontsizeis,'Position', [0.1 0.1 0.85 0.85]);
+        hAxs= axes('Parent',hxten,'Units', 'normalized','Units','normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position', [0.1 0.1 0.85 0.85]);
         switch(idx) 
-            case 1;% Curve-Weighting Function
+            case 1% Curve-Weighting Function
                 plot__curve_weights(hAxs);
-            case 3;% survey locations
+            case 3% survey locations
                 Update_survey_locations(hAxs);
-            case 4;% view data
+            case 4% view data
                 Show_survey(hAxs)
-            case 5;% view model 1d
+            case 5% view model 1d
                 Show_bestmodels_family(hAxs);
-            case 6;% view model 2d
+            case 6% view model 2d
                 if(property_23d_to_show>0); 
                     %plot_2d_profile(hxten, hAxs, property_23d_to_show); 
                     plot_3d(hxten, hAxs, property_23d_to_show);
                 end
-            case 7;% view confidence
+            case 7% view confidence
                 confidence_plot(hxten,hAxs,  S,poten, X1,X2, var1,var2, vala,valb, nlaya,nlayb)
-            case 8;% view confidence
+            case 8% view confidence
                 sensitivity_plot(hxten,hAxs)
-            case 9;% view Misfit VS Iteration
+            case 9% view Misfit VS Iteration
                 draw_Misfit_vs_it(hxten,hAxs);
         end
     end
@@ -5873,7 +7095,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 %                     
 %             end
             
-            saveas(h_gui, fname);% saveas(hh, fname);
+            saveas(H.gui, fname);% saveas(hh, fname);
             fprintf('Image saved.\n');
         end
     end
@@ -6101,6 +7323,33 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     end
 
 % _________________________________________________________________________
+    %% MATLAB MACHINE
+    function create_new_tab(tabname)
+        P.tab_id=P.tab_id+1;
+        switch Matlab_Release
+            case '2010a'
+                H.TABS(P.tab_id)  = uitab('v0','Parent',hTabGroup, 'Title',tabname);
+            case '2015b'
+                H.TABS(P.tab_id)  = uitab('Parent',hTabGroup, 'Title',tabname);
+            case '2014a'
+                H.TABS(P.tab_id)  = uitab('Parent',hTabGroup, 'Title',tabname);
+            case '2017b'
+                H.TABS(P.tab_id)  = uitab('Parent',hTabGroup, 'Title',tabname);    
+            otherwise
+                H.TABS(P.tab_id)  = uitab('Parent',hTabGroup, 'Title',tabname);
+        end
+    end
+    function [height] = get_normalheight_on_panel(panel_handle,gui_height)
+        %
+        % translate normal height of with respect to full GUI
+        % into a value valid for the specified panel
+        %
+        vecposition = get(panel_handle,'position');%,'linewidth',1);
+        panel_points = G.main_h*vecposition(4);% panel height in points
+        panel_over_main_ratio =  panel_points/G.main_h;%                  ratio referred to full interface
+        height = gui_height/panel_over_main_ratio;%                   unitary height of objects in this pane
+    end
+    
 end% end gui
 
 

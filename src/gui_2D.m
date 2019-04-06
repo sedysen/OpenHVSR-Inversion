@@ -189,6 +189,7 @@ n_depth_levels     = 100;
 smoothing_strategy = 3;
 smoothing_radius   = 3;
 color_limits       = [0 5000];
+FLAG_enable_interpolated_images = 1;
 %
 %%    Target Earthquake
 HQfreq = [];%        fFS,
@@ -971,32 +972,32 @@ objy = dh + ( (Nrowa-1):-1:0 )*(1/Nrowa);
 objw = 1-2*dw;
 objx = dw;
 row = 1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
+hButtRF = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
     'String','Refresh', ...
     'Units','normalized','Position',[objx, objy(row), objw, objh], ...
     'Callback',{@BT_refresh_2D_profile});
 row = row+2;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
+hButtVP = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
     'String','Vp', ...
     'Units','normalized','Position',[objx, objy(row), objw, objh], ...
     'Callback',{@BT_show_2D_profile,1});
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
+hButtVS = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
     'String','Vs', ...
     'Units','normalized','Position',[objx, objy(row), objw, objh], ...
     'Callback',{@BT_show_2D_profile,2});
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
+hButtRO = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
     'String','Ro', ...
     'Units','normalized','Position',[objx, objy(row), objw, objh], ...
     'Callback',{@BT_show_2D_profile,3});
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
+hButtQP = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
     'String','Qp', ...
     'Units','normalized','Position',[objx, objy(row), objw, objh], ...
     'Callback',{@BT_show_2D_profile,4});
 row = row+1;
-uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
+hButtQS = uicontrol('FontSize',fontsizeis,'Style','pushbutton','parent',hT4_P1, ...
     'String','Qs', ...
     'Units','normalized','Position',[objx, objy(row), objw, objh], ...
     'Callback',{@BT_show_2D_profile,5});
@@ -1403,10 +1404,59 @@ set(h_gui, 'ToolBar', 'none');
 
             % load data files FDAT (Field DATa)
             FDAT = load_data2(working_folder,SURVEYS, datafile_columns,datafile_separator);
+            if isempty(SURVEYS)% still empty
+                warning('I was not able to load this project (empty SURVEYS). aborting...');
+                fprintf('\n')
+                return;
+            end
+            %% check the project is developed along X axis
+            minx = SURVEYS{1}(1);
+            maxx = SURVEYS{1}(1);
+            miny = SURVEYS{1}(2);
+            maxy = SURVEYS{1}(2);
+            for ss = 1:size(SURVEYS,1)
+                if SURVEYS{ss}(1)<minx; minx=SURVEYS{ss}(1); end
+                if SURVEYS{ss}(1)>maxx; maxx=SURVEYS{ss}(1); end
+                %
+                if SURVEYS{ss}(2)<miny; miny=SURVEYS{ss}(2); end
+                if SURVEYS{ss}(2)>maxy; maxy=SURVEYS{ss}(2); end
+            end
+            if minx==maxx
+                if miny<maxy
+                    warning('Seems that the profile is along the Y axis. I will swap X and Y coordinates.')
+                    fprintf('(pause, hit any key)\n')
+                    pause
+                    fprintf('\n')
+                    fprintf('\n')
+                    fprintf('\n')
+                    for ss = 1:size(SURVEYS,1)
+                        YY = SURVEYS{ss}(1);
+                        XX = SURVEYS{ss}(2);
+                        SURVEYS{ss}(1) = XX;
+                        SURVEYS{ss}(2) = YY;
+                    end
+                else
+                    fprintf('MESSAGE:  Seems that all measurements are located in the same point. Please check X-Y coordinated.\n')
+                    fprintf('          Any image using interpolation will be disabled.\n')
+                    fprintf('(pause, hit any key)\n')
+                    pause
+                    fprintf('\n')
+                    fprintf('\n')
+                    fprintf('\n')
+                    set(hButtRF,'enable','off')
+                    set(hButtVP,'enable','off')
+                    set(hButtVS,'enable','off')
+                    set(hButtRO,'enable','off')
+                    set(hButtQS,'enable','off')
+                    set(hButtQP,'enable','off')
+                    
+                    FLAG_enable_interpolated_images = 0;
+                end
+            end
             INIT_FDATS();
 
             % load subsurface starting models MDL (Field DATa)
-            MDLS  = load_models(working_folder,SURVEYS,MODELS);      
+            MDLS  = load_models(working_folder,SURVEYS,MODELS);
             %% update interface
             INIT_tool_variables();
             Update_survey_locations(hAx_geo)      
@@ -3333,7 +3383,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
        set(h_1d_next,      'Enable','on'); 
        set(T3_p1_revert,   'Enable','on');
        bgc = 0.9*[1 1 1];
-        set(hObject,'BackgroundColor',bgc);
+       set(hObject,'BackgroundColor',bgc);
     end
     function B_start_inversion__independently_SW(hObject,~,~)
        if(~isempty(FDAT) && data_1d_to_show)
@@ -5234,7 +5284,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 case 4;  P = TMDL(:,5); str = 'Qp';
                 case 5;  P = TMDL(:,6); str = 'Qs';
                 %
-                case 6; 
+                case 6 
                     vp = TMDL(:,1);
                     vs = TMDL(:,2);
                     P = 0.5*(vp.^2 - 2*vs.^2)./(vp.^2 - vs.^2);% Nu
@@ -5359,6 +5409,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
 
     %%
     function plot_2d_profile(figure_handle, axes_handle, quantity)
+        if ~FLAG_enable_interpolated_images; return; end
 		set(figure_handle,'CurrentAxes',axes_handle);
         hold(axes_handle,'off')
         plot(0,0)
