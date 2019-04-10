@@ -1,12 +1,24 @@
-function publish_gui(h_gui,h10,appname,version)
-    
-    set(h_gui,'Name',[appname,' ',version])
-    set(h_gui   ,'Visible','on');% Make the GUI visible.
-    
-    
-    
+function Pfunction__publish_gui(h_gui,h_menuCredits,appname,version)
+%% Copyright 2015 by Samuel Bignardi.
+%
+% This file is part of the program OpenHVSR-Inversion.
+%
+% OpenHVSR-Inversion is free software: you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation, either version 3 of the License, or
+% (at your option) any later version.
+%
+% OpenHVSR-Inversion is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% You should have received a copy of the GNU General Public License
+% along with OpenHVSR-Processing Toolkit.  If not, see <http://www.gnu.org/licenses/>.
+%
+%
+%    
           
-    Message =     ['Copyright 2015 by Samuel Bignardi                                         '; ...                                                              '; ...
+    Message =     ['Copyright 2015 by Samuel Bignardi                                         '; ...
+                   'www.samuelbignardi.com                                                    '; ...
+                   '                                                                          '; ...
                    'Distributed under the GNU GPL Licence, see the attached "COPYING" file.   '; ...
                    '                                                                          '; ...
                    'If you use this software for research purposes please cite:               '; ...
@@ -28,7 +40,7 @@ function publish_gui(h_gui,h10,appname,version)
                    'DOI: 10.1016/j.cageo.2016.05.009                                          '; ...
                    '                                                                          '; ...
                    'Abu Zeid,N.; Corradini,E.; Bignardi,S.; Nizzo,V.; Santarato,G. (2017)     '; ...
-                   'The passive seismic technique “HVSR” as a reconnaissance tool for mapping '; ...
+                   'The passive seismic technique "HVSR" as a reconnaissance tool for mapping '; ...
                    'paleo-soils: the case of the Pilastri archaeological site, Northern Italy '; ...
                    'Archaeological Prospection. DOI: 10.1002/arp.1568                         '; ...
                    '                                                                          '; ...
@@ -58,9 +70,18 @@ function publish_gui(h_gui,h10,appname,version)
                    'NOTES:                                                                    '; ...
                    '  For any question, suggestion or bug fix, please contact me at the       '; ...
                    '  following email:sedysen@gmail.com                                       '; ...
-                   '                  samuel.bignardi@unife.it                                '; ...
-                   ];
-    set(h10,'UserData',Message);
-     
-    %msgHandle = msgbox(Message,'CREDITS:');    
+                   '                  samuel.bignardi@unife.it                                '];
+    set(h_menuCredits,'UserData',Message);
+               
+    set(h_menuCredits,'UserData',Message);
+    
+    set(h_gui,  'Name',strcat(appname,'-',version) )
+    set(h_gui   ,'Visible','on');% Make the GUI visible.
+    
+    %msgHandle = msgbox(Message,'CREDITS:');
+
+
+%warning('FIX THE CREDITS MESSAGE')
+
+    
 end

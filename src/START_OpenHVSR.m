@@ -65,10 +65,10 @@ if ~strcmp(current_folder , ffullpath)
 end
 %%
 if strcmp(mode,'2D')
-    gui_2D(enable_menu,fontsizeis);% routine for 2D geometry
+    gui_2D_190410(enable_menu,fontsizeis);% routine for 2D geometry
 end
 if strcmp(mode,'3D')
-    gui_3D();% routine for 3D geometry
+    gui_3D_190410();% routine for 3D geometry
 end
 
 

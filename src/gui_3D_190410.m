@@ -20,17 +20,7 @@
 %
 %
 % Lateral constrained montecarlo inversion of HVSR data
-
-
-%% >>> in save the file Profiles is now a cell.  
-% P substituted profile related
-% P.isshown.id <<  data_id_to_show
-
-
-%
-
-
-function gui_3D()  
+function gui_3D_190410()  
 
 close all
 clc
@@ -294,13 +284,6 @@ REFERENCE_MODEL_zpoints  = [];
 %% xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 %%
 %% MAIN GUI ===============================================================
-appname = 'OpenHVSR-3D  (BETA)';%% Note: the "3D" in appname is used to recognize dimensionality
-version = 'v4.0.0';
-% Changes respect previous versions:
-%      v2.0     modeling and inversion of surface waves implemented
-%      v4.0     All tab with new generative code.
-%               new "Main View tab".
-%
 DSP = get(0,'ScreenSize');% [left, bottom, width, height]
 main_l = 0.1 * DSP(3);
 main_b = 0.1 * DSP(4);
@@ -361,8 +344,7 @@ uimenu(h5_1,'Label','Bone','Callback',{@Menu_view_cmap_Bone});
 h7  = uimenu(H.gui,'Label','Extra');
 uimenu(h7,'Label','Schreenshot','Callback',{@funct_saveimage});
 %%    About
-h10  = uimenu(H.gui,'Label','About OpenHVSR');
-uimenu(h10,'Label','Credits','Callback',{@Menu_About_Credits});
+H.menu.credits  = uimenu(H.gui,'Label','Credits','Callback',{@Menu_About_Credits});
 %%
 %%
 %% ************************* INTERFACE OBJECTS ****************************
@@ -1582,8 +1564,6 @@ H.PANELS{P.tab_id}.B = uipanel('FontSize',USER_PREFERENCE_interface_objects_font
 hAx_sns_hcmenu = uicontextmenu;
 uimenu(hAx_sns_hcmenu, 'Label', 'Edit externally','Callback', {@plot_extern,8});
 hAx_sensitivity = axes('Parent',H.PANELS{P.tab_id}.B,'Units', 'normalized','Units','normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',pos_axis,'uicontextmenu',hAx_sns_hcmenu);
-
-
 %% Initializations before gui publication
 %[fFS,FSraw]=FourierSpectrum(magn,delt,dept,rock); %Compute theoretical Fourier spectrum for target earthquake (see Setup)
 [HQfreq, QHspec] = FourierSpectrum( HQMagnitude,  HQEpicDistance, HQFocalDepth, HQRockRatio);
@@ -1592,12 +1572,16 @@ hAx_sensitivity = axes('Parent',H.PANELS{P.tab_id}.B,'Units', 'normalized','Unit
 spunta(eh52_childs, smoothing_strategy);
 %% Publish GUI and set history
 working_folder = '';
-last_project_name = 'myproject.m';
+last_project_name = 'OpenHVSR_Inv__project.m';
+last_elaboration_name = 'OpenHVSR_Inv__Elaboration_main.mat';
 last_log_number= 0;
+if exist('history.m', 'file') == 2
 history
-
-
-publish_gui(H.gui,h10,appname,version);
+end
+% 
+set(H.gui, 'MenuBar', 'none');
+set(H.gui, 'ToolBar', 'none');
+Pfunction__publish_gui(H.gui,H.menu.credits,P.appname_3D,P.appversion_3D);
 
 
 %
@@ -1615,7 +1599,7 @@ publish_gui(H.gui,h10,appname,version);
             fid = fopen(newprojectname,'w');
 
             fprintf(fid,'%% This is a project-file to input the program\n');
-            fprintf(fid,'%% %s, %s\n',appname,version);
+            fprintf(fid,'%% %s, %s\n',P.appname_3D,P.appversion_3D);
             fprintf(fid,'\n');
             fprintf(fid,'%% Determined how H/V files are read\n');
             fprintf(fid,'%% datafile_columns:   describes the columnwise structure of the data\n'); 
@@ -1681,13 +1665,15 @@ publish_gui(H.gui,h10,appname,version);
             %% updating history
             working_folder = thispath;
             last_project_name = file;
-            last_log_number=last_log_number+1;
+            if get(H.menu.settings.log,'UserData')==1; last_log_number=last_log_number+1; end
             fid = fopen('history.m','w');
             fprintf(fid, 'working_folder = ''%s'';\n', working_folder);
             fprintf(fid, 'last_project_name = ''%s'';\n', last_project_name);
+            fprintf(fid, 'last_elaboration_name = ''%s'';\n', last_elaboration_name);
             fprintf(fid, 'last_log_number = %d;\n', last_log_number);
-            fclose(fid);
             
+            
+            fclose(fid);            
 			%% logging (temporarily commented)
 % % %             today = date;
 % % %             logfolder = strcat(working_folder,'logs');
@@ -1701,12 +1687,11 @@ publish_gui(H.gui,h10,appname,version);
 % % %             else
 % % %                 fprintf('log folder found.\n'); 
 % % %             end
-% % %             logname = strcat(working_folder,'logs/LOG_n',num2str(last_log_number),'_',appname,'_',version,'_',today,'.log');
+% % %             logname = strcat(working_folder,'logs/LOG_n',num2str(last_log_number),'_',P.appname_3D,'_',P.appversion_3D,'_',today,'.log');
 % % %             set(0,'DiaryFile',logname)
 % % %             diary(logname);
 % % %             diary on;
-% % %             fprintf('logging on %s\n',get(0,'DiaryFile'))
-            
+% % %             fprintf('logging on %s\n',get(0,'DiaryFile'))            
             %% loading stuff
             scriptname = strcat(thispath,file);
             run(scriptname);
@@ -1841,7 +1826,7 @@ publish_gui(H.gui,h10,appname,version);
             fid = fopen(newprojectname,'w');
 
             fprintf(fid,'%% This is a project-file to input the program\n');
-            fprintf(fid,'%% %s, %s\n',appname,version);
+            fprintf(fid,'%% %s, %s\n',P.appname_3D,P.appversion_3D);
             fprintf(fid,'\n');
             fprintf(fid,'%% Determined how H/V files are read\n');
             fprintf(fid,'datafile_separator = ''%s'';\n', datafile_separator);
@@ -1936,7 +1921,7 @@ publish_gui(H.gui,h10,appname,version);
             %save(datname);
                       save(datname, ...
   'OpenHVSR_elaboration_file_version', ...      
-  'appname', ... 
+  ... % CHANGE 190404  ver 4.0.0: 'appname' -> P.appname_3D
   'file', ...
   'thispath', ...
   'ui_dist', ... 
@@ -2238,7 +2223,7 @@ publish_gui(H.gui,h10,appname,version);
   'valb', ...                                                       
   'var1', ...                                                       
   'var2', ...                                                       
-  'version', ...                              
+  ...% CHANGE 190404  ver 4.0.0:  'version' -> P.appversion_3D                             
   'vfst_MDLS', ...                                                    
   'view_max_scale', ...                                             
   'view_min_scale', ...
@@ -2354,7 +2339,7 @@ publish_gui(H.gui,h10,appname,version);
                 if isfield(BIN,'X2'); X2 = BIN.X2; end
                 if isfield(BIN,'ZZList'); ZZList = BIN.ZZList; end % (3D)
                 % NO  if isfield(BIN,'ans'); ans = BIN.ans; end
-                if isfield(BIN,'appname'); appname = BIN.appname; end
+x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                 if isfield(BIN,'basevalue'); basevalue = BIN.basevalue; end
                 if isfield(BIN,'basevaluew'); basevaluew = BIN.basevaluew; end
                 if isfield(BIN,'bedrock'); bedrock = BIN.bedrock; end
@@ -2554,7 +2539,7 @@ publish_gui(H.gui,h10,appname,version);
                 if isfield(BIN,'valb'); valb = BIN.valb; end
                 if isfield(BIN,'var1'); var1 = BIN.var1; end
                 if isfield(BIN,'var2'); var2 = BIN.var2; end
-                if isfield(BIN,'version'); version = BIN.version; end
+                %190404 if isfield(BIN,'version'); version = BIN.version; end
                 if isfield(BIN,'vfst_MDLS'); vfst_MDLS = BIN.vfst_MDLS; end
                 if isfield(BIN,'view_max_scale'); view_max_scale = BIN.view_max_scale; end
                 if isfield(BIN,'view_min_scale'); view_min_scale = BIN.view_min_scale; end
@@ -2677,7 +2662,7 @@ publish_gui(H.gui,h10,appname,version);
                 if isfield(BIN,'X2'); X2 = BIN.X2; end
                 if isfield(BIN,'ZZList'); ZZList = BIN.ZZList; end % (3D)
                 % NO  if isfield(BIN,'ans'); ans = BIN.ans; end
-                if isfield(BIN,'appname'); appname = BIN.appname; end
+                %190404 if isfield(BIN,'appname'); appname = BIN.appname; end
                 if isfield(BIN,'basevalue'); basevalue = BIN.basevalue; end
                 if isfield(BIN,'basevaluew'); basevaluew = BIN.basevaluew; end
                 if isfield(BIN,'bedrock'); bedrock = BIN.bedrock; end
@@ -2877,7 +2862,7 @@ publish_gui(H.gui,h10,appname,version);
                 if isfield(BIN,'valb'); valb = BIN.valb; end
                 if isfield(BIN,'var1'); var1 = BIN.var1; end
                 if isfield(BIN,'var2'); var2 = BIN.var2; end
-                if isfield(BIN,'version'); version = BIN.version; end
+                %190404 if isfield(BIN,'version'); version = BIN.version; end
                 if isfield(BIN,'vfst_MDLS'); vfst_MDLS = BIN.vfst_MDLS; end
                 if isfield(BIN,'view_max_scale'); view_max_scale = BIN.view_max_scale; end
                 if isfield(BIN,'view_min_scale'); view_min_scale = BIN.view_min_scale; end
@@ -3063,7 +3048,7 @@ publish_gui(H.gui,h10,appname,version);
     end
 %%      About
     function Menu_About_Credits(~,~,~)
-        msgbox(get(h10,'UserData'),'CREDITS:')   
+        msgbox(get(H.menu.credits,'UserData'),'CREDITS:')   
     end
 %% TAB-1: ================================================= Main View
     function CB_hAx_geo_back(~,~,~)
@@ -3748,7 +3733,8 @@ publish_gui(H.gui,h10,appname,version);
             drawsquare(hAx_cwf,boxx,boxy);
             
             %[~,value] = ginput(1);% take points
-            if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
+            %if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
+            if Matlab_Release_num>2017.1% Solve ginput issuewith R2017b and above
                 [~,value] = sam2018b_ginput(1);
             else
                 [~,value] = ginput(1);
@@ -3845,7 +3831,8 @@ publish_gui(H.gui,h10,appname,version);
             drawsquare(hAx_dwf,boxx,boxy);
             
             %[~,value] = ginput(1);% take points
-            if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
+            %if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
+            if Matlab_Release_num>2017.1% Solve ginput issuewith R2017b and above
                 [~,value] = sam2018b_ginput(1);
             else
                 [~,value] = ginput(1);
@@ -3962,8 +3949,14 @@ publish_gui(H.gui,h10,appname,version);
         if Matlab_Release_num>2017.1% Solve ginput issuewith R2017b and above
             [xx,yy] = sam2018b_ginput(2, hAx_main_geo);%hAx_main_geo);
         else
-            [xx,yy] = ginput(2, hAx_main_geo);% hAx_main_geo);
+            if Matlab_Release_num==2016.1
+                axes(hAx_main_geo)
+                [xx,yy] = ginput(2);
+            else
+                [xx,yy] = ginput(2, hAx_main_geo);
+            end
         end
+        
         if( (xx(1)==xx(2)) && (yy(1)==yy(2))); return; end
         dummy_ids = zeros(Np,3);
         dummy_line    = [xx,yy];

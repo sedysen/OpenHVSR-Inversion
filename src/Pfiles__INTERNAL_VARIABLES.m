@@ -1,7 +1,7 @@
 
 %% INFO
-P.appname = 'OpenHVSR-Inversion';%% Note: the "3D" in P.appname is used to recognize dimensionality
-P.appversion = 'v1.0.0';
+P.appname_3D = 'OpenHVSR-3D Inversion  (BETA)';%% Note: the "3D" in P.appname is used to recognize dimensionality
+P.appversion_3D = 'v4.0.0';
 
 %% Data shown
 P.isshown.id                    = 0;%  Id of dataset shown in inversion
@@ -50,6 +50,8 @@ P.invshown.id                    = 0;%  Id of inversion parameters shown in inve
 %%    Tabs handles
 H.TABS = [];% Handels of tabs
 P.tab_id    = 0;
+%%    Menu handles
+H.menu.settings.log = 0;% explicitly declared for compatibility with the new menu handles organization (ferom V 4.0.0)
 %%    Main window sizing and creation
 P.DSP = get(0,'ScreenSize');% [left, bottom, width, height]
 G.main_l = 0.1 * P.DSP(3);
@@ -89,6 +91,7 @@ G.main_object_levels = ((G.Full_height_divided_by-1):-1:0)./G.Full_height_divide
 % % % P.TAB_view3d_Discretization = [50, 50];
 % % % %%    TAB: IVS&W
 % % % P.TAB_IBSeW_Discretization = [50, 50];
+%
 % 
 % 
 % 
