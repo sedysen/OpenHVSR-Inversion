@@ -104,7 +104,7 @@ prev_BEST_SINGLE_MISFIT = [];
 prev_single_it          = 0;
 %
 weight_curv =[];                                % curve weights definition
-CW = {};                                        % USED  curve-weights
+CW = {};                                        % USED  curve-weights (cell: for future development)
 %
 weight_dpth=[];                                % depth weights definition
 DW  = {};                                      % USED  depth-weights
@@ -4504,7 +4504,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
        end
        bgc = [1 0.5 0.1];
        set(T3_P1_inv,'BackgroundColor',bgc,'enable','off')
-        set(T3_P1_invSW,'enable','off')
+       if strcmp(FLAG__PC_features,'on'); set(T3_P1_invSW,'enable','off'); end
         %
         set(T3_p1_revert,'enable','off')
         set(h_1d_spreadALL,'enable','off')
@@ -4592,7 +4592,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             %pause(0.002);
             drawnow
         end
-
+        %% update
         Show_survey(0);
         hold(hAx_1dprof,'off')
         draw_1d_profile(hAx_1dprof, vfst_MDLS{P.isshown.id},'b',1);
@@ -4618,7 +4618,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         %
        bgc = 0.9*[1 1 1];
        set(T3_P1_inv,'BackgroundColor',bgc,'enable','on')
-        set(T3_P1_invSW,'enable','on')
+       if strcmp(FLAG__PC_features,'on'); set(T3_P1_invSW,'enable','on'); end
         %
        set(T3_P1_inv_stop,'enable','off')
        set(T3_P1_inv_stop,'string','')
@@ -5880,7 +5880,9 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
     end
 
     function setup_curve_weights()
-        for d = 1 :size(FDAT,1)
+%        for d = 1 :size(FDAT,1)
+            CW = cell(1);
+            d=1;
             CW{d}= spline(weight_curv(:,1), weight_curv(:,2), main_scale);
 %             figure
 %             plot(weight_curv(:,1), weight_curv(:,2),'k'); hold on
@@ -5895,7 +5897,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
 %                     CW{d}(fi) = 0;
 %                 end
 %             end
-        end
+ %       end
     end
     function setup_dpth_weights()
         Nmodels = size(MDLS,2); 
@@ -6613,7 +6615,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         % er:        misfit divided by the sum of the weights 
         data_curve = FDAT{survey_id,2}(ixmin_id:ixmax_id);
         sint_curve = SYM(ixmin_id:ixmax_id,1);
-        weights = (CW{survey_id}).^2;
+        weights = (CW{1}).^2;%(CW{survey_id}).^2;
         weights(DISCARDS{survey_id},:) = 0;
         weights = weights(ixmin_id:ixmax_id);
         % figure; plot(main_scale, CW{survey_id},'.-b'); pause        
