@@ -8,7 +8,7 @@ P.isshown.id                    = 0;%  Id of dataset shown in inversion
 % P.isshown.accepted_windows      = [];% is accepted windows are changed it will be recorded here
 
 %% Inversion shown
-P.invshown.id                    = 0;%  Id of inversion parameters shown in inversion
+%P.invshown.id                    = 0;% NOT USED YET Id of inversion parameters shown in inversion
 
 %% Profiles
 % P.profile.id                    = 0;%  actually considered 2D profile

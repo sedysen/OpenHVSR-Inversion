@@ -90,13 +90,13 @@ modl_FDATSW= {};                                % response of the Add S.W. butto
 last_FDAT  = {};                                % Last Models. after inversion step.
 best_FDAT  = {};                                % Best Models. after inversion step.
 %                                               FDAT = cell(N, 3) == [freq, hvsr, standard_deviation]
+best_MISFIT_by_location = [];%                        Laterally constrained optimization (one vector recording the best misfit for each location)
 %
 MDLS       = {};                                % Subsurface Initial models [vp  vs  rho  h  Qp  Qs] - > [VPList,VSList,ROList,Hprofile,QPList,QSList]
 %                                               % If a better model is found, the new model will overwrite this
 last_MDLS  = {};                                % Last Models. after inversion step.
 vfst_MDLS  = {};                                % very first model.
-
-
+%
 prev_MDLS               = {};                   % models before last optimization section
 prev_BEST_SINGLE_MODELS = {};
 prev_best_FDAT          = {};
@@ -113,13 +113,12 @@ LKT = [];                                      % Lock Table (comply with setting
 RCT = [];                                      % Relax constrains:
 %                                                column 1: relax Vp/Vs higher bound (Allaw Water table)
 %
-%
-
 r_reciprocicity = [];                          % (3D) station to station distances table
 receiver_locations     = [];                   % (3D) stations locations          
 cutplanes       = [0,1, 0,1, 0,1];             % (3D) sliders for slicing          
 %isslice         = cutplanes;                  % (3D) coordinates for slicing     
 %r_distance_from_profile = 50;                  % (3D) 
+Flag__stop_inversion = 0;
 %
 %
 %% USER_PREFERENCE_interface_objects_fontsize is NEW
@@ -143,21 +142,14 @@ TO_INVERT = [];                            % [1] if files have to be used
 NresultsToKeep = 50;
 global_inversion_step = 0;
 
-BEST_MISFITS = realmax() * ones(NresultsToKeep,1);
-BEST_ENERGIES= BEST_MISFITS;
-BEST_MODELS  = cell(NresultsToKeep,1);
-
-BEST_SINGLE_MISFIT = {};%{P.isshown.id}(id) = Single_Misfit;
-BEST_SINGLE_MODELS = {};%{id,P.isshown.id}  = last_single_MDLS;
-
-%
-% Single measurement optimization
-%best_single_FDAT = {};
-last_single_FDAT = {};
+% Laterally constrained optimization
+BEST_ENERGIES =  realmax() * ones(NresultsToKeep,1);% Laterally constrained optimization
+BEST_MISFITS = realmax() * ones(NresultsToKeep,1);%   Laterally constrained optimization
+BEST_MODELS = cell(NresultsToKeep,1);%                Laterally constrained optimization
 init_single_FDAT = {};%                      in single optimization section: inittial model 
 %
 last_single_MDL = {};
-
+last_single_FDAT = {};
 BEST_SINGLE_MISFIT = [];
 BEST_SINGLE_MODELS = {};
 
@@ -192,6 +184,8 @@ STORED_2d_qs_fits         = {};
 STORED_2d_daf_fits        = {};
 
 Misfit_vs_Iter            = {};
+Misfit_vs_Iter_MULPTIPLE  = [];% retains the best misfit value in crinological(iteration time). Sum lump of all surveys
+Misfit_vs_Iter_MULPTIPLE_local = [];% retains the best misfit value in crinological(iteration time). At each location (ID)
 inversion_is_started__inedipendent= '';
 inversion_is_started__global      = '';
 
@@ -236,7 +230,7 @@ ndegfree = 0;
 lsmooth =  3;
 nlvl    = 30;
 default_colormap = 'Jet';
-S=[]; poten=1; X1=[]; X2=[]; var1=0; var2=0; vala=0; valb=0; nlaya=0; nlayb=0;
+SS=[]; poten=1; X1=[]; X2=[]; var1=0; var2=0; vala=0; valb=0; nlaya=0; nlayb=0;
 %%    Sensitivity plots
 sns_1d_to_show         = 0;
 SN_xscale              = [];
@@ -351,8 +345,6 @@ H.menu.credits  = uimenu(H.gui,'Label','Credits','Callback',{@Menu_About_Credits
 %% Panels
 Pnl = [];
 Pfiles_PANELS
-
-%190404 hTab_Main      = uitab('v0','Parent',hTabGroup, 'Title','Main View');
 %% ABOUT MATLAB RELEASE: Get release and apply release-specific behavior  
 [Matlab_Release,Matlab_Release_num, hTabGroup,SelectionChangeOption] = Pfiles_Function_MATLAB_Release(H.gui);
 P.SelectionChangeOption = SelectionChangeOption;
@@ -535,22 +527,26 @@ uimenu(hAx_maingeo_hcmenu, 'Label', 'Discard  ALL profiles',    'Callback', {@re
 %uimenu(hAx_geo_hcmenu, 'Label', 'Disable','Callback', @CM_hAx_geo_disable);
 %uimenu(hAx_geo_hcmenu, 'Label', 'Enable', 'Callback', @CM_hAx_geo_enable);
 uimenu(hAx_maingeo_hcmenu, 'Label', 'Edit externally',    'Callback', {@plot_extern,3}, 'Separator','on');
+uimenu(hAx_maingeo_hcmenu, 'Label', 'Edit externally (profile)',    'Callback', {@plot_extern,31});
 pos_axes  = [0.1 0.1 0.8 0.8];
 hAx_main_geo= axes('Parent',H.PANELS{P.tab_id}.B,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',pos_axes,'uicontextmenu',hAx_maingeo_hcmenu);
-%% TAB-1: ======================================================= Inversion
+%% TAB-1: ============================================== Inversion (Global)
 %
 %   [AA][BBBBBB]
 %   [AA][BBBBBB]
 %   [AA][BBBBBB]
 %   [AA][BBBBBB]
 %
-create_new_tab('Inversion');
+create_new_tab('Global Inversion');
 %%set(H.TABS(P.tab_id),'ButtonDownFcn',{@CB_TAB_main_view_update})
 %%     Panels
-H.PANELS{P.tab_id}.A = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units', 'normalized','Position',Pnl.Lay0.A);
+H.PANELS{P.tab_id}.A = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units', 'normalized','Position',Pnl.Lay5.A);
 if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.A,'title','A');end
-H.PANELS{P.tab_id}.B = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units','normalized','Position',Pnl.Lay0.B);
+H.PANELS{P.tab_id}.B = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units','normalized','Position',Pnl.Lay5.B);
 if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.B,'title','B');end
+H.PANELS{P.tab_id}.C = uipanel('parent',H.TABS(P.tab_id),'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Units','normalized','Position',Pnl.Lay5.C);
+if(strcmp(P.ExtraFeatures.tab_labels_enable_status,'on')); set(H.PANELS{P.tab_id}.C,'title','C');end
+
 %
 %%     Objets on panel A
 objh = get_normalheight_on_panel( H.PANELS{P.tab_id}.A, G.main_objh );
@@ -560,7 +556,8 @@ objy = get_normalheight_on_panel( H.PANELS{P.tab_id}.A, G.main_object_levels );
 %%          random method
 row = 1;
 basevalue = '5';
-basevaluew ='1';
+basevalue2= '0';
+basevaluew ='0';
 row = row+4;
 objw = [0.3, 0.7];
 objx = [0.0, 0.3];
@@ -647,7 +644,7 @@ uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
 h_ro_val = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
     'parent',H.PANELS{P.tab_id}.A, ...
-    'String',basevalue, ...
+    'String',basevalue2, ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);%, ...
 %     'Callback',{@CB_Set_RO_percent});
 h_ro_w = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
@@ -665,7 +662,7 @@ uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
 h_qp_val = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
     'parent',H.PANELS{P.tab_id}.A, ...
-    'String',basevalue, ...
+    'String',basevalue2, ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);%, ...
 %    'Callback',{@CB_Set_QP_percent});
 h_qp_w = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
@@ -683,7 +680,7 @@ uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
 h_qs_val = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Style','edit', ...
     'parent',H.PANELS{P.tab_id}.A, ...
-    'String',basevalue, ...
+    'String',basevalue2, ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);%, ...
 %      'Callback',{@CB_Set_QS_percent});
 h_qs_w = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
@@ -774,9 +771,10 @@ h_fwd_sw=uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style'
 row = row+1;
 objw = [0.5, 0.3 0.2];
 objx = [0, (objw(1)),  (sum(objw(1:2)))];
-T2_P1_inv_button_bw = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','togglebutton','parent',H.PANELS{P.tab_id}.A, ...
+T2_P1_inv_button_bw = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','START Inversion (P/S)', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
+    'Interruptible','on', ...
     'Callback',{@B_start_inversion});
 T2_P1_global_it_count = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A, ...
     'String','0 So far.', ...
@@ -787,20 +785,27 @@ T2_P1_max_it = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'
     'BackgroundColor', [1 1 1]);
 %
 row = row+1;
-T2_P1_inv_button_sw = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','togglebutton','parent',H.PANELS{P.tab_id}.A, ...
+T2_P1_inv_button_sw = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','START Inversion (SW)', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Enable',FLAG__PC_features, ...
+    'Interruptible','on', ...
     'Callback',{@B_start_inversion_SW});
 T2_P1_progress = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A, ...
     'String','', ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh]);
 
 row = row+1;
+objw = [0.5, 0.5];
+objx = [0,  0.5];
 T2_P1_inv_button_lw = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Automatic Weighting', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_auto_lateral_weights});
+T2_P1_inv_stop = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
+    'String','','Enable','off','Value', 0, ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
+    'Callback',{@B_stop_inversion_all});
 %%          mouse over tips
 if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
     hoveoverstring = sprintf('Select the distribution which the perturbations will obey');
@@ -846,9 +851,7 @@ if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
     hoveoverstring = sprintf('Number of iterations still to perform');
     set(T2_P1_max_it,'TooltipString',hoveoverstring)
 end
-%%    Panel-B  Curve-Weighting Function
-%190404 pos_panel = [0.325 0.50,  (1-0.325) 0.50];
-%190404 hT2_P2 = uipanel('title','Frequence-Weighting Function','parent',hTab_Inversion,'Units','normalized','Position',pos_panel); 
+%%    Panel-B  Curve-Weighting and Depth-Weighting Function
 hAx_cwf_hcmenu = uicontextmenu;
 uimenu(hAx_cwf_hcmenu, 'Label', 'Modify',  'Callback', @CM_hAx_cwf_modify);
 uimenu(hAx_cwf_hcmenu, 'Label', 'Exp. Decay',  'Callback', @CM_set_logaritmic_decreasing);
@@ -863,21 +866,31 @@ hAx_cwf= axes('Parent',H.PANELS{P.tab_id}.B,'Units', 'normalized','Units','norma
     'uicontextmenu',hAx_cwf_hcmenu, ...
     'title','Curve Weights');
 %
-%%    Panel-C  Depth-Weighting Function
-%190404 pos_panel = [0.325 0.00,  (1-0.325) 0.50];
-%190404 hT2_P3 = uipanel('title','Depth-Weighting Function','parent',hTab_Inversion,'Units','normalized','Position',pos_panel); 
 hAx_dwf_hcmenu = uicontextmenu;
 uimenu(hAx_dwf_hcmenu, 'Label', 'Modify',  'Callback', @CM_hAx_dwf_modify);
 uimenu(hAx_dwf_hcmenu, 'Label', 'Reset',   'Callback', @CM_hAx_dwf_reset_to_1);
 uimenu(hAx_dwf_hcmenu, 'Label', 'Show linear',    'Callback', @CM_hAx_dwf_show_lin);
 uimenu(hAx_dwf_hcmenu, 'Label', 'Show logaritmic','Callback', @CM_hAx_dwf_show_log);
+uimenu(hAx_dwf_hcmenu, 'Label', 'Edit externally',    'Callback', {@plot_extern,2}, 'Separator','on');
 Position_Axes = [0.1 0.15 0.8 0.3];
 hAx_dwf= axes('Parent',H.PANELS{P.tab_id}.B,'Units','normalized', ...
     'FontSize',USER_PREFERENCE_interface_objects_fontsize, ...
     'Position', Position_Axes, ...
     'uicontextmenu',hAx_dwf_hcmenu, ...
     'title','Depth Weights');
-%% TAB-2: ======================================================== Model 1D
+%%    Panel-C   Misfit view
+%           general misfit
+pos_axes3 = [0.1 0.15  0.35 0.8];
+hAx_MvsIT_hcmenu_full = uicontextmenu;
+uimenu(hAx_MvsIT_hcmenu_full, 'Label', 'Edit externally','Callback', {@plot_extern,10});
+hAx_MvsIT_full = axes('Parent',H.PANELS{P.tab_id}.C,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',pos_axes3,'uicontextmenu',hAx_MvsIT_hcmenu_full);
+%           local misfit
+pos_axes4 = [0.6 0.15  0.35 0.8];
+hAx_MvsIT_hcmenu_full_local = uicontextmenu;
+uimenu(hAx_MvsIT_hcmenu_full_local, 'Label', 'Edit externally','Callback', {@plot_extern,10});
+hAx_MvsIT_full_local = axes('Parent',H.PANELS{P.tab_id}.C,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',pos_axes4,'uicontextmenu',hAx_MvsIT_hcmenu_full_local);
+%
+%% TAB-2: =============================================== Inversion (Local)
 %
 %   [BB][CCC][DDD]
 %   [BB][CCC][DDD]
@@ -932,7 +945,7 @@ h_1d_disable =uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'S
     'String','Disable', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@CM_hAx_geo_disable});
-uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
+h_1d_enable =uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Enable', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
     'Callback',{@CM_hAx_geo_enable});
@@ -948,7 +961,7 @@ h_1d_Lock = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Sty
     'String','Lock Model', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_lock_model});
-uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
+h_1d_Unlock = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Unlock Model', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
     'Callback',{@B_unlock_model});
@@ -987,10 +1000,11 @@ uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbut
 %%
 row = row+2;
 objw = [0.3, 0.3 0.3];
-objx = [0, objw(1), sum(objw(1:2))];% 0.01 + [0, objw(1), sum(objw(1:2))];
-T3_P1_inv = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','togglebutton','parent',H.PANELS{P.tab_id}.A, ...
+objx = [0, objw(1), sum(objw(1:2))];
+T3_P1_inv = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Optimize (P/S)', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
+    'Interruptible','on', ...
     'Callback',{@B_start_inversion__independently});
 T3_P1_it_count = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','text','parent',H.PANELS{P.tab_id}.A, ...
     'String','0', ...
@@ -1000,16 +1014,23 @@ T3_P1_max_it = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh], ...
     'BackgroundColor', [1 1 1]);
 row = row+1;
-T3_P1_invSW = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','togglebutton','parent',H.PANELS{P.tab_id}.A, ...
+T3_P1_invSW = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Optimize (SW)', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Enable',FLAG__PC_features, ...
+    'Interruptible','on', ...
     'Callback',{@B_start_inversion__independently_SW});
 row = row+1;
+objw = [0.3, 0.5];
+objx = [0,  0.5];
 T3_p1_revert = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Revert', ...
     'Units','normalized','Position',[objx(1), objy(row), objw(1), objh], ...
     'Callback',{@B_revert_1d});
+T3_P1_inv_stop = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
+    'String','','Enable','off','Value', 0, ...
+    'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
+    'Callback',{@B_stop_inversion});
 
 row = row+1;
 objw = [0.1, 0.3];
@@ -1117,8 +1138,8 @@ hAx_1dprof= axes('Parent',H.PANELS{P.tab_id}.E,'Units', 'normalized','FontSize',
 %
 pos_axes2 = [0.6 0.075  0.38 1];
 hAx_MvsIT_hcmenu = uicontextmenu;
-uimenu(hAx_MvsIT_hcmenu, 'Label', 'Edit externally','Callback', {@plot_extern,5});
-hAx_MvsIT = axes('Parent',H.PANELS{P.tab_id}.E,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',pos_axes2);%,'uicontextmenu',hAx_MvsIT_hcmenu);
+uimenu(hAx_MvsIT_hcmenu, 'Label', 'Edit externally','Callback', {@plot_extern,9});
+hAx_MvsIT = axes('Parent',H.PANELS{P.tab_id}.E,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',pos_axes2,'uicontextmenu',hAx_MvsIT_hcmenu);
 %
 %%    mouse over tips
 if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
@@ -1356,7 +1377,6 @@ hconf_xprop = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'S
     'string',[' Vp'; ' Vs'; ' Ro'; ' H '; ' Qp'; ' Qs'; 'DAF']);
 hconf_xlay = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','listbox','parent',H.PANELS{P.tab_id}.A, ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
-
 %%      mouse over tips
 if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
     % X-axis
@@ -1404,7 +1424,6 @@ hconf_yprop = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'S
     'string',[' Vp'; ' Vs'; ' Ro'; ' H '; ' Qp'; ' Qs'; 'DAF']);
 hconf_ylay = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','listbox','parent',H.PANELS{P.tab_id}.A, ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh]);
-
 %%      mouse over tips
 if strcmp(USER_PREFERENCE_Move_over_suggestions,'on')
     % Y-axis
@@ -1737,14 +1756,22 @@ Pfunction__publish_gui(H.gui,H.menu.credits,P.appname_3D,P.appversion_3D);
 		    
 		    FLAG_enable_interpolated_images = 0;
             end
-            INIT_FDATS();
+            %INIT_FDATS();
 
             % load subsurface starting models MDL (Field DATa)
             MDLS  = load_models(working_folder,SURVEYS,MODELS);
-            %% update interface
+            
+            %% init memory spaces
             INIT_tool_variables();
+            %% pre-select location 1
+            P.isshown.id = 1;
+            
+            %% update interface
             Update_survey_locations(hAx_main_geo);
-            Update_survey_locations(hAx_geo)      
+            Update_survey_locations(hAx_geo)  
+            Show_survey(0);
+            %hold(hAx_1dprof,'off');
+            draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
 
         end
         %% check for reference models 
@@ -1977,7 +2004,7 @@ Pfunction__publish_gui(H.gui,H.menu.credits,P.appname_3D,P.appversion_3D);
   'REFERENCE_MODEL_dH', ...  
   'REFERENCE_MODEL_zpoints', ...    
   'ROList', ... % (3D)
-  'S', ...                          
+  'SS', ...                          
   'SN_centralval', ...              
   'SN_dtamsf', ...                  
   'SN_parname', ...                 
@@ -2236,7 +2263,10 @@ Pfunction__publish_gui(H.gui,H.menu.credits,P.appname_3D,P.appversion_3D);
   'zlevels', ...
   'inversion_is_started__inedipendent', ...%                               From version 3.0.0
   'inversion_is_started__global', ...%                                     From version 3.0.0
-  'P');%                                                                   From version 4.0.0
+  'P', ...%                                                                   From version 4.0.0
+  'Misfit_vs_Iter_MULPTIPLE_local', ...
+  'Misfit_vs_Iter_MULPTIPLE', ...
+  'best_MISFIT_by_location');
 
             fprintf('[Elaboration saved]\n')
         end
@@ -2290,7 +2320,7 @@ Pfunction__publish_gui(H.gui,H.menu.credits,P.appname_3D,P.appversion_3D);
                 if isfield(BIN,'REFERENCE_MODEL_dH'); REFERENCE_MODEL_dH = BIN.REFERENCE_MODEL_dH; end
                 if isfield(BIN,'REFERENCE_MODEL_zpoints'); REFERENCE_MODEL_zpoints = BIN.REFERENCE_MODEL_zpoints; end
                 if isfield(BIN,'ROList'); ROList = BIN.ROList; end
-                if isfield(BIN,'S'); S = BIN.S; end
+                if isfield(BIN,'S'); SS = BIN.S; end% 190410 compatibility 4.0.0
                 if isfield(BIN,'SN_centralval'); SN_centralval = BIN.SN_centralval; end
                 if isfield(BIN,'SN_dtamsf'); SN_dtamsf = BIN.SN_dtamsf; end
                 if isfield(BIN,'SN_parname'); SN_parname = BIN.SN_parname; end
@@ -2613,7 +2643,8 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                 if isfield(BIN,'REFERENCE_MODEL_dH'); REFERENCE_MODEL_dH = BIN.REFERENCE_MODEL_dH; end
                 if isfield(BIN,'REFERENCE_MODEL_zpoints'); REFERENCE_MODEL_zpoints = BIN.REFERENCE_MODEL_zpoints; end
                 if isfield(BIN,'ROList'); ROList = BIN.ROList; end
-                if isfield(BIN,'S'); S = BIN.S; end
+                if isfield(BIN,'S'); S = BIN.S; end%         190410 compatibility
+                if isfield(BIN,'SS'); SS = BIN.SS; end%  190410 compatibility
                 if isfield(BIN,'SN_centralval'); SN_centralval = BIN.SN_centralval; end
                 if isfield(BIN,'SN_dtamsf'); SN_dtamsf = BIN.SN_dtamsf; end
                 if isfield(BIN,'SN_parname'); SN_parname = BIN.SN_parname; end
@@ -2878,9 +2909,13 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                 if isfield(BIN,'inversion_is_started__global');        inversion_is_started__global      = BIN.inversion_is_started__global; end
                 %% From 4.0.0
                 if isfield(BIN,'P');  P= BIN.P; end
+                if isfield(BIN,'Misfit_vs_Iter_MULPTIPLE_local');  Misfit_vs_Iter_MULPTIPLE_local= BIN.Misfit_vs_Iter_MULPTIPLE_local; end
+                if isfield(BIN,'Misfit_vs_Iter_MULPTIPLE');  Misfit_vs_Iter_MULPTIPLE= BIN.Misfit_vs_Iter_MULPTIPLE; end
+                if isfield(BIN,'best_MISFIT_by_location');  best_MISFIT_by_location= BIN.best_MISFIT_by_location; end
+                
             end% load version 2 (from 4.0.0)
             
-            %% Update Interface  if isfield(BIN,'');  = BIN.; end
+            %% Update Interface
             if isfield(BIN,'ui_dist');   set(hRand,    'Value',    BIN.ui_dist);   end
             if isfield(BIN,'ui_hh_pc');  set(h_hh_val, 'String',   BIN.ui_hh_pc);   end
 
@@ -2906,11 +2941,13 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             if isfield(BIN,'ui_frnge_d');  set(h_dscale,   'String',   BIN.ui_frnge_d);   end
             
             fprintf('[Elaboration resumed Correctly]\n')
+            %% Select location 1
             P.isshown.id = 1;
+            %BEST_SINGLE_MISFIT = prev_BEST_SINGLE_MISFIT;
             %% graphics
-            plot__curve_weights(hAx_cwf);
-            plot__depth_weights();
-            Show_survey(hAx_dat);
+            plot__curve_weights(0);
+            plot__depth_weights(0);
+            Show_survey(0);
             %
             Update_survey_locations(hAx_main_geo);
             Update_survey_locations(hAx_geo);
@@ -2975,32 +3012,32 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
 %%          smoothing
     function Menu_smoothing_strategy0_Callback(~,~,~)
         smoothing_strategy = 0; spunta(eh52_childs, smoothing_strategy);
-        plot_2d_profile( H.gui,  hAx_2Dprof,property_23d_to_show);
+        plot_2d_profile( 0,property_23d_to_show);
     end
     function Menu_smoothing_strategy1_Callback(~,~,~)
         smoothing_strategy = 1; 
         set_smoothing_radius();
         spunta(eh52_childs, smoothing_strategy);% disable_components();
-        plot_2d_profile( H.gui,  hAx_2Dprof,property_23d_to_show);
+        plot_2d_profile( 0,property_23d_to_show);
     end
     function Menu_smoothing_strategy2_Callback(~,~,~)
         smoothing_strategy = 2; 
         set_smoothing_radius();
         spunta(eh52_childs, smoothing_strategy);% disable_components();
-        plot_2d_profile( H.gui,  hAx_2Dprof,property_23d_to_show);
+        plot_2d_profile( 0,property_23d_to_show);
     end
     function Menu_smoothing_strategy3_Callback(~,~,~)
         smoothing_strategy = 3;
         set_smoothing_radius(); 
         spunta(eh52_childs, smoothing_strategy);% disable_components();
-        plot_2d_profile( H.gui,  hAx_2Dprof,property_23d_to_show);
+        plot_2d_profile( 0,property_23d_to_show);
     end
     function set_smoothing_radius()
         prompt = {'Smoothing Radius (0 = off)'};
         def = {num2str(smoothing_radius)};
         answer = inputdlg(prompt,'Smoothing',1,def);
         smoothing_radius = str2double(answer{1});
-        %plot_2d_profile( H.gui,  hAx_2Dprof,parameter_id)
+        %plot_2d_profile( 0,parameter_id)
     end
 %%          colormap
     function Menu_view_cmap_Jet(~,~,~)
@@ -3033,18 +3070,18 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         if(~isempty(answer))
             view_min_scale = str2double(answer{1});        
             view_max_scale = str2double(answer{2});
-            Show_survey(hAx_dat)
+            Show_survey(0)
         end
     end
     function Menu_view_xcurverange_fitprocessed(~,~,~)
         view_min_scale = str2double( get(h_scale_min,'String') );
         view_max_scale = str2double( get(h_scale_max,'String') );
-        Show_survey(hAx_dat)
+        Show_survey(0)
     end
     function Menu_view_xcurverange_fitdata(~,~,~)
         view_min_scale = min(main_scale);
         view_max_scale = max(main_scale);
-        Show_survey(hAx_dat)
+        Show_survey(0)
     end
 %%      About
     function Menu_About_Credits(~,~,~)
@@ -3073,7 +3110,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             set(T3_P1_it_count,'String',strcat( num2str(independent_optimiazation_cicles(P.isshown.id)),' so far'));
             Update_survey_locations(hAx_main_geo);
             Update_survey_locations(hAx_geo);
-            Show_survey(hAx_dat);
+            Show_survey(0);
             %plot_1d_profile(hAx_1dprof);
             
             hold(hAx_1dprof,'off');
@@ -3103,7 +3140,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             set(T3_P1_it_count,'String',strcat( num2str(independent_optimiazation_cicles(P.isshown.id)),' so far'));
             Update_survey_locations(hAx_main_geo);
             Update_survey_locations(hAx_geo);
-            Show_survey(hAx_dat);
+            Show_survey(0);
             %plot_1d_profile(hAx_1dprof);
 
             hold(hAx_1dprof,'off');
@@ -3136,7 +3173,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                 set(T3_P1_it_count,'String',strcat( num2str(independent_optimiazation_cicles(P.isshown.id)),' so far'));
                 Update_survey_locations(hAx_main_geo);
                 Update_survey_locations(hAx_geo);
-                Show_survey(hAx_dat);
+                Show_survey(0);
                 %plot_1d_profile(hAx_1dprof);
 
                 hold(hAx_1dprof,'off');
@@ -3362,7 +3399,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             return;
         end
     end
-%% TAB-2: =================================================
+%% TAB-2: ================================================= Inversion (Global)
 %% TAB-2, Panel-1: Inversion
     function lock_table_modify(~,~,~)
         [LKT, RCT] = lockparameters_manager();
@@ -3418,35 +3455,35 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                 max_lat_dQs = str2double(answer{5});
                 %
                 if(max_lat_dVp>0)
-                    www = maxmisf/(   0.5*maxlayr*(max_lat_dVp^2)  );
+                    www = 0.05*maxmisf/(   0.5*maxlayr*(max_lat_dVp^2)  );
                     set(h_vp_w, 'String', num2str(www)  );
                 else
                     set(h_vp_w, 'String', '0'  );
                 end
                 %
                 if(max_lat_dVs>0)
-                    www = maxmisf/(   0.5*maxlayr*(max_lat_dVs^2)  );
+                    www = 0.05*maxmisf/(   0.5*maxlayr*(max_lat_dVs^2)  );
                     set(h_vs_w, 'String', num2str(www)  );
                 else
                     set(h_vs_w, 'String', '0'  );
                 end
                 %
                 if(max_lat_dRo>0)
-                    www = maxmisf/(   0.5*maxlayr*(max_lat_dRo^2)  );
+                    www = 0.05*maxmisf/(   0.5*maxlayr*(max_lat_dRo^2)  );
                     set(h_ro_w, 'String', num2str(www)  );
                 else
                     set(h_ro_w, 'String', '0'  );
                 end
                 %
                 if(max_lat_dQp>0)
-                    www = maxmisf/(   0.5*maxlayr*(max_lat_dQp^2)  );
+                    www = 0.05*maxmisf/(   0.5*maxlayr*(max_lat_dQp^2)  );
                     set(h_qp_w, 'String', num2str(www)  );
                 else
                     set(h_qp_w, 'String', '0'  );
                 end
                 %
                 if(max_lat_dQs>0)
-                    www = maxmisf/(   0.5*maxlayr*(max_lat_dQs^2)  );
+                    www = 0.05*maxmisf/(   0.5*maxlayr*(max_lat_dQs^2)  );
                     set(h_qs_w, 'String', num2str(www)  );
                 else
                     set(h_qs_w, 'String', '0'  );
@@ -3455,267 +3492,390 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         end
     end
     function B_start_inversion(~,~,~)
-        if(~isempty(FDAT))
-            if get(T2_P1_inv_button_bw,'Value')
-                if ~isempty(inversion_is_started__global)
-                    if(~strcmp(inversion_is_started__global,'BW'))
-                       quest = 'It is not advisable to mix Body and Surface Waves inversions. Continue?';
-                       answer = questdlg(quest);
-                       if strcmp(answer,'No'); return; end
-                       if strcmp(answer,'Cancel'); return; end
-                    end
-                end
-                bgc = [1 0.5 0.1];
-                set(T2_P1_inv_button_bw,'BackgroundColor',bgc);
-                set(T2_P1_progress,'String','');
-                prev_MDLS = MDLS;
-                setup_dpth_weights();
-
-                %get curve x-ranges ids
-                xmin = str2double( get(h_scale_min,'String') );
-                xmax = str2double( get(h_scale_max,'String') );
-                ddx   = str2double( get(h_dscale,   'String') );
-                %[ixmin_id,ixmax_id] = 
-                get_curve_xindex_bounds(xmin,xmax);
-
-
-                %x_vec = linspace(xmin,xmax,(xmax-xmin)/ddx);
-                nnx = abs(main_scale(ixmax_id)-main_scale(ixmin_id))/ddx; 
-                x_vec = linspace( main_scale(ixmin_id), main_scale(ixmax_id),nnx); 
-
-
-                ex   = str2double( get(h_ex_val,  'String') );
-                fref = str2double( get(h_fref_val,'String') );  
-                iii = 0;
-                set(T2_P1_inv_button_bw,'String','STOP')  
-                set(T2_P1_global_it_count,'String',strcat(num2str(global_inversion_step),' So far.'));
-                togo = str2double(get(T2_P1_max_it,'String'));
-                Nsurveys = size(SURVEYS,1);
-                inversion_is_started__global = 'BW'; 
-                while (get(T2_P1_inv_button_bw,'Value') && (togo > 0) )
-                  iii = iii+1;
-                  if(iii == 1) 
-                      last_MDLS = MDLS;
-                  else
-                      last_MDLS = perturbe_models(MDLS);
-                  end
-
-                  %% HERAk's routine translated by Bignardi here ! ================
-                  % vp       last_MDLS{model}(:,1)
-                  % vs       last_MDLS{model}(:,2)
-                  % ro       last_MDLS{model}(:,3)
-                  % h        last_MDLS{model}(:,4)
-                  % qs       last_MDLS{model}(:,5)
-                  % qp       last_MDLS{model}(:,6)
-                  % freq.    FDAT{model,1};
-                  fullMisfit = 0; fuller = 0;
-                  for m = 1:Nsurveys
-                    %% ========================================================
-                    % as_Samuel(c,ro,h,q,ex,fref,f)  
-                    VP = last_MDLS{m}(:,1);
-                    VS = last_MDLS{m}(:,2);
-                    RO = last_MDLS{m}(:,3);
-                    HH = last_MDLS{m}(:,4);
-                    QP = last_MDLS{m}(:,5);
-                    QS = last_MDLS{m}(:,6);
-
-                    aswave = as_Samuel(VS,RO,HH,QS,ex,fref, x_vec);
-                    apwave = as_Samuel(VP,RO,HH,QP,ex,fref, x_vec);
-                    last_FDAT{m,1} = FDAT{m,1};
-                    
-                    %warning('interpolation here');
-                    hvsr_teo = (aswave./apwave);
-
-                    %last_FDAT{m,2} = ( interp1(x_vec, hvsr_teo, main_scale(ixmin_id:ixmax_id) ) ).';
-
-                    last_FDAT{m,2} = 0*main_scale;
-                    last_FDAT{m,2}(ixmin_id:ixmax_id,1) = ( interp1(x_vec, hvsr_teo, main_scale(ixmin_id:ixmax_id) ) ).';
-                    %% ========================================================
-                    [DAF] = get_amplification_factor(x_vec,aswave);
-
-                    %% store
-                    [Single_Misfit,~,~,er] = get_single_model_misfit(m, last_FDAT{m,2} );
-
-                    STORED_2d_vp_fits{m} = [STORED_2d_vp_fits{m}; VP.'];
-                    STORED_2d_vs_fits{m} = [STORED_2d_vs_fits{m}; VS.'];
-                    STORED_2d_ro_fits{m} = [STORED_2d_ro_fits{m}; RO.'];
-                    STORED_2d_hh_fits{m} = [STORED_2d_hh_fits{m}; HH.'];
-                    STORED_2d_qp_fits{m} = [STORED_2d_qp_fits{m}; QP.'];
-                    STORED_2d_qs_fits{m} = [STORED_2d_qs_fits{m}; QS.'];
-                    STORED_2d_daf_fits{m}= [STORED_2d_daf_fits{m}; DAF];
-                    %[Single_Misfit, er];
-                    STORED_RESULTS_2d_misfit{m} = [STORED_RESULTS_2d_misfit{m}; [Single_Misfit,er]];
-                    fullMisfit = fullMisfit + Single_Misfit; 
-                    fuller     = fuller + er;
-                  end
-                  %% ==============================================================
-                  global_inversion_step = global_inversion_step+1;
-                  set(T2_P1_global_it_count,'String',num2str(global_inversion_step));
-
-                  Rfit   = Regularize();
-                  Energy =  fullMisfit + Rfit;
-                  fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
-
-                  %% profile misfit
-                  STORED_RESULTS_2d_misfit_profile = [STORED_RESULTS_2d_misfit_profile; [fullMisfit, fuller, Energy]];
-    %                fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
-                    if isnan(Energy)==1% then something went wrong and need correction
-                        iii = iii-1;
-                        %
-                        STORED_2d_vp_fits{m} = STORED_2d_vp_fits{m}(1:(end-1),:);
-                        STORED_2d_vs_fits{m} = STORED_2d_vs_fits{m}(1:(end-1),:);
-                        STORED_2d_ro_fits{m} = STORED_2d_ro_fits{m}(1:(end-1),:);
-                        STORED_2d_hh_fits{m} = STORED_2d_hh_fits{m}(1:(end-1),:);
-                        STORED_2d_qp_fits{m} = STORED_2d_qp_fits{m}(1:(end-1),:);
-                        STORED_2d_qs_fits{m} = STORED_2d_qs_fits{m}(1:(end-1),:);
-                        STORED_2d_daf_fits{m}= STORED_2d_daf_fits{m}(1:(end-1),:);
-                        %[Single_Misfit, er];
-                        STORED_RESULTS_2d_misfit{m} = STORED_RESULTS_2d_misfit{m}(1:(end-1),:);
-                        %
-                        global_inversion_step = global_inversion_step-1;
-                        %
-                        STORED_RESULTS_2d_misfit_profile = STORED_RESULTS_2d_misfit_profile(1:(end-1),:);
-                    else% inversion step is acceptable
-                        Store_Results(Energy,fullMisfit);
-                        togo = togo-1;
-                        set(T2_P1_max_it,'String', num2str( togo  ) );
-                        fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
-                    end
-                    pause(0.002);
-                end
-                set(T2_P1_inv_button_bw,'Value',0)
-                set(T2_P1_inv_button_bw,'String','START Inversion (P/S)')
-                bgc = 0.9*[1 1 1];
-                set(T2_P1_inv_button_bw,'BackgroundColor',bgc);
+            if(isempty(FDAT))
+                fprintf('No data was loaded. Please load a project.\n')
+                return;
             end
-            %set(hObject,'Value',0)
-            %set(hObject,'String','START Inversion (P/S)')
-        else
-            fprintf('No data was loaded. Please load a project.\n')
-        end
+            if ~isempty(inversion_is_started__global)
+                if(~strcmp(inversion_is_started__global,'BW'))
+                   quest = 'It is not advisable to mix Body and Surface Waves inversions. Continue?';
+                   answer = questdlg(quest);
+                   if strcmp(answer,'No'); return; end
+                   if strcmp(answer,'Cancel'); return; end
+                end
+            end
+            %
+            bgc = [1 0.5 0.1];
+            set(T2_P1_inv_button_bw,'BackgroundColor',bgc,'enable','off')
+            set(T2_P1_inv_button_sw,'enable','off')
+            %
+            set(h_fwd_bw ,'enable','off')
+            set(h_fwd_sw ,'enable','off')
+            set(T2_P1_inv_button_lw,'enable','off')
+            %
+            set(T2_P1_inv_stop,'enable','on')
+            set(T2_P1_inv_stop,'string','STOP')
+            set(T2_P1_inv_stop,'BackgroundColor',bgc);
+            %
+            set(T2_P1_progress,'String','');       
+                
+            
+            prev_MDLS = MDLS;
+            setup_dpth_weights();
+
+            %get curve x-ranges ids
+            xmin = str2double( get(h_scale_min,'String') );
+            xmax = str2double( get(h_scale_max,'String') );
+            ddx   = str2double( get(h_dscale,   'String') );
+            %[ixmin_id,ixmax_id] = 
+            get_curve_xindex_bounds(xmin,xmax);
+
+
+            %x_vec = linspace(xmin,xmax,(xmax-xmin)/ddx);
+            nnx = abs(main_scale(ixmax_id)-main_scale(ixmin_id))/ddx; 
+            x_vec = linspace( main_scale(ixmin_id), main_scale(ixmax_id),nnx); 
+
+
+            ex   = str2double( get(h_ex_val,  'String') );
+            fref = str2double( get(h_fref_val,'String') );  
+            iii = 0;
+            set(T2_P1_global_it_count,'String',strcat(num2str(global_inversion_step),' So far.'));
+            togo = str2double(get(T2_P1_max_it,'String'));
+            Nsurveys = size(SURVEYS,1);
+            inversion_is_started__global = 'BW'; 
+            the_best_energy  = min(BEST_ENERGIES);
+            misfit_vector = zeros(1,Nsurveys);% 190410 
+            er_vector     = zeros(1,Nsurveys);% 190410 
+            while ( (Flag__stop_inversion==0) && (togo > 0) )
+              iii = iii+1;
+              if(iii == 1) 
+                  last_MDLS = MDLS;
+              else
+                  last_MDLS = perturbe_models(MDLS);
+              end
+              %last_FDAT = FDAT;% last_FDAT{m,1} = FDAT{m,1};
+              last_FDAT = FDAT;% last_FDAT{m,1} = FDAT{m,1};
+
+              %% HERAk's routine translated by Bignardi here ! ================
+              % vp       last_MDLS{model}(:,1)
+              % vs       last_MDLS{model}(:,2)
+              % ro       last_MDLS{model}(:,3)
+              % h        last_MDLS{model}(:,4)
+              % qs       last_MDLS{model}(:,5)
+              % qp       last_MDLS{model}(:,6)
+              % freq.    FDAT{model,1};
+              %fullMisfit = 0;  %  190410
+              %fuller = 0; %       190410
+              fullCurve_term = 0;% 190410
+              fullSlope_term = 0;% 190410
+              for m = 1:Nsurveys
+                %% ========================================================
+                % as_Samuel(c,ro,h,q,ex,fref,f)  
+                VP = last_MDLS{m}(:,1);
+                VS = last_MDLS{m}(:,2);
+                RO = last_MDLS{m}(:,3);
+                HH = last_MDLS{m}(:,4);
+                QP = last_MDLS{m}(:,5);
+                QS = last_MDLS{m}(:,6);
+
+                aswave = as_Samuel(VS,RO,HH,QS,ex,fref, x_vec);
+                apwave = as_Samuel(VP,RO,HH,QP,ex,fref, x_vec);
+                %last_FDAT{m,1} = FDAT{m,1};
+                %warning('interpolation here');
+                hvsr_teo = (aswave./apwave);
+
+                %last_FDAT{m,2} = ( interp1(x_vec, hvsr_teo, main_scale(ixmin_id:ixmax_id) ) ).';
+                last_FDAT{m,2} = 0*main_scale;
+                last_FDAT{m,2}(ixmin_id:ixmax_id,1) = ( interp1(x_vec, hvsr_teo, main_scale(ixmin_id:ixmax_id) ) ).';
+                %% ========================================================
+                [DAF] = get_amplification_factor(x_vec,aswave);
+
+                %% store
+                [Single_Misfit,Curve_term,Slope_term,er] = get_single_model_misfit(m, last_FDAT{m,2} );
+                %
+                STORED_2d_vp_fits{m} = [STORED_2d_vp_fits{m}; VP.'];
+                STORED_2d_vs_fits{m} = [STORED_2d_vs_fits{m}; VS.'];
+                STORED_2d_ro_fits{m} = [STORED_2d_ro_fits{m}; RO.'];
+                STORED_2d_hh_fits{m} = [STORED_2d_hh_fits{m}; HH.'];
+                STORED_2d_qp_fits{m} = [STORED_2d_qp_fits{m}; QP.'];
+                STORED_2d_qs_fits{m} = [STORED_2d_qs_fits{m}; QS.'];
+                STORED_2d_daf_fits{m}= [STORED_2d_daf_fits{m}; DAF];
+                %[Single_Misfit, er];
+                STORED_RESULTS_2d_misfit{m} = [STORED_RESULTS_2d_misfit{m}; [Single_Misfit,er]];
+                %fullMisfit = fullMisfit + Single_Misfit; % 190410
+                %fuller     = fuller + er; % 190410
+                fullCurve_term = fullCurve_term + Curve_term;% 190410
+                fullSlope_term = fullSlope_term + Slope_term;% 190410
+                misfit_vector(m) = Single_Misfit;% 190410
+                er_vector(m)     = er;% 190410
+                if(iii == 1) 
+                    best_MISFIT_by_location(m) = Single_Misfit;% 190410
+                end
+              end
+              %% 190410 >>>>>>>> Keep only location with decreased energy
+%                   count =0;
+              for m = 1:Nsurveys
+                  if misfit_vector(m) >  best_MISFIT_by_location(m)
+                    % this model was not improved (revert to previous) 
+                    misfit_vector(m)=  best_MISFIT_by_location(m);
+                    last_MDLS{m}   = MDLS{m};
+                    last_FDAT{m,1} = best_FDAT{m,1};
+%                         count = count+1;
+                  end
+              end
+%                   if count>0
+%                       clc
+%                       fprintf('[%d]/%d were reverted\n',count,Nsurveys);
+%                       pause
+%                   end
+              fullMisfit = sum( misfit_vector );
+              fuller     = sum( er_vector );
+              %% <<<<<<<< 190410
+
+              %% ==============================================================
+              global_inversion_step = global_inversion_step+1;
+              set(T2_P1_global_it_count,'String',num2str(global_inversion_step));
+
+              Rfit   = Regularize();
+              Energy =  fullMisfit + Rfit;
+              %fprintf('%d) ENERGY GAP[%f]pc    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,(100*(Energy-the_best_energy)/the_best_energy),fullMisfit,Rfit);
+
+              %% profile misfit
+              STORED_RESULTS_2d_misfit_profile = [STORED_RESULTS_2d_misfit_profile; [fullMisfit, fuller, Energy]];
+                % fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
+                if isnan(Energy)==1% then something went wrong and need correction
+                    iii = iii-1;
+                    %
+                    STORED_2d_vp_fits{m} = STORED_2d_vp_fits{m}(1:(end-1),:);
+                    STORED_2d_vs_fits{m} = STORED_2d_vs_fits{m}(1:(end-1),:);
+                    STORED_2d_ro_fits{m} = STORED_2d_ro_fits{m}(1:(end-1),:);
+                    STORED_2d_hh_fits{m} = STORED_2d_hh_fits{m}(1:(end-1),:);
+                    STORED_2d_qp_fits{m} = STORED_2d_qp_fits{m}(1:(end-1),:);
+                    STORED_2d_qs_fits{m} = STORED_2d_qs_fits{m}(1:(end-1),:);
+                    STORED_2d_daf_fits{m}= STORED_2d_daf_fits{m}(1:(end-1),:);
+                    %[Single_Misfit, er];
+                    STORED_RESULTS_2d_misfit{m} = STORED_RESULTS_2d_misfit{m}(1:(end-1),:);
+                    %
+                    global_inversion_step = global_inversion_step-1;
+                    %
+                    STORED_RESULTS_2d_misfit_profile = STORED_RESULTS_2d_misfit_profile(1:(end-1),:);
+                else% inversion step is acceptable
+                    Store_Results(Energy, fullMisfit, Rfit, fullCurve_term,  fullSlope_term, misfit_vector);% 190410
+                    togo = togo-1;
+                    set(T2_P1_max_it,'String', num2str( togo  ) );
+                    %fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
+                    fprintf('%d) ENERGY GAP[%f]pc    REGULARIZER/MISFIT[%f]   MISFIT/[%f]   REGULARIZER[%f]\n', ...
+                        global_inversion_step,(100*(Energy-the_best_energy)/the_best_energy), ...
+                        Rfit/fullMisfit, ...
+                        fullMisfit,Rfit);
+                end
+                drawnow%pause(0.005);
+            end
+            
+            bgc = 0.9*[1 1 1];
+            set(T2_P1_inv_button_bw,'BackgroundColor',bgc,'enable','on')
+            set(T2_P1_inv_button_sw,'enable','on')
+            %
+            set(h_fwd_bw ,'enable','on')
+            set(h_fwd_sw ,'enable','on')
+            set(T2_P1_inv_button_lw,'enable','on')
+            %
+            set(T2_P1_inv_stop,'enable','off')
+            set(T2_P1_inv_stop,'string','')
+            set(T2_P1_inv_stop,'BackgroundColor',bgc);
+            Flag__stop_inversion=0;
     end
     function B_start_inversion_SW(~,~,~)
-        if get(T2_P1_inv_button_sw,'Value')
-            if(~isempty(FDAT))
-                if ~isempty(inversion_is_started__global)
-                    if(~strcmp(inversion_is_started__global,'SW'))
-                       quest = 'It is not advisable to mix Body and Surface Waves inversions. Continue?';
-                       answer = questdlg(quest);
-                       if strcmp(answer,'No'); return; end
-                       if strcmp(answer,'Cancel'); return; end
-                    end
-                end
-                bgc = [1 0.5 0.1];
-                set(T2_P1_inv_button_sw,'BackgroundColor',bgc);
-                set(T2_P1_progress,'String','');
-                prev_MDLS = MDLS;
-                setup_dpth_weights();
-
-                %get curve x-ranges ids
-                xmin = str2double( get(h_scale_min,'String') );
-                xmax = str2double( get(h_scale_max,'String') );
-                ddx   = str2double( get(h_dscale,   'String') );
-                %[ixmin_id,ixmax_id] = 
-                get_curve_xindex_bounds(xmin,xmax);  
-                iii = 0;
-                set(T2_P1_inv_button_sw,'String','STOP')  
-                set(T2_P1_global_it_count,'String',strcat(num2str(global_inversion_step),' So far.'));
-                togo = str2double(get(T2_P1_max_it,'String'));
-                Nsurveys = size(SURVEYS,1);
-                inversion_is_started__global = 'SW'; 
-                while (get(T2_P1_inv_button_sw,'Value') && (togo > 0) )
-                  iii = iii+1;
-                  if(iii == 1) 
-                      last_MDLS = MDLS;
-                  else
-                      last_MDLS = perturbe_models(MDLS);
-                  end
-
-                  fullMisfit = 0; fuller = 0;
-                  for m = 1:Nsurveys
-                    %  set(T2_P1_progress,'String',num2str(Nsurveys+1-m));
-                    %  vp  vs  rho  h  Qp  Qs
-                    VP = last_MDLS{m}(:,1);
-                    VS = last_MDLS{m}(:,2);
-                    RO = last_MDLS{m}(:,3);
-                    HH = last_MDLS{m}(:,4);
-                    QP = last_MDLS{m}(:,5);
-                    QS = last_MDLS{m}(:,6);
-                    [FF,HV] = call_Albarello_2011(sw_nmodes, sw_nsmooth, ddx, xmax, HH,VP,VS,RO,QP,QS);
-                    FF=flipud(FF);
-                    HV=flipud(HV);
-
-                    last_FDAT{m,1} = main_scale;
-                    temphv = 0*main_scale;
-                    temphv(ixmin_id:ixmax_id,1) = ( interp1(FF, HV, main_scale(ixmin_id:ixmax_id) ) );
-                    last_FDAT{m,2} = temphv;%interp1(FF,HV,main_scale,'spline','extrap');
-                    DAF = 0;
-                    %% ========================================================
-
-                    %% store
-                    [Single_Misfit,~,~,er] = get_single_model_misfit(m, last_FDAT{m,2} );
-
-                    STORED_2d_vp_fits{m} = [STORED_2d_vp_fits{m}; VP.'];
-                    STORED_2d_vs_fits{m} = [STORED_2d_vs_fits{m}; VS.'];
-                    STORED_2d_ro_fits{m} = [STORED_2d_ro_fits{m}; RO.'];
-                    STORED_2d_hh_fits{m} = [STORED_2d_hh_fits{m}; HH.'];
-                    STORED_2d_qp_fits{m} = [STORED_2d_qp_fits{m}; QP.'];
-                    STORED_2d_qs_fits{m} = [STORED_2d_qs_fits{m}; QS.'];
-                    STORED_2d_daf_fits{m}= [STORED_2d_daf_fits{m}; DAF];
-                    %[Single_Misfit, er];
-                    STORED_RESULTS_2d_misfit{m} = [STORED_RESULTS_2d_misfit{m}; [Single_Misfit,er]];
-                    fullMisfit = fullMisfit + Single_Misfit; 
-                    fuller     = fuller + er;
-                  end
-                  %% ==============================================================
-                  global_inversion_step = global_inversion_step+1;
-                  set(T2_P1_global_it_count,'String',num2str(global_inversion_step));
-
-                  Rfit   = Regularize();
-                  Energy =  fullMisfit + Rfit;
-                  %% profile misfit
-                  STORED_RESULTS_2d_misfit_profile = [STORED_RESULTS_2d_misfit_profile; [fullMisfit, fuller, Energy]];
-    %                fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
-
-
-                    if isnan(Energy)==1% then something went wrong and need correction
-                        iii = iii-1;
-                        %
-                        STORED_2d_vp_fits{m} = STORED_2d_vp_fits{m}(1:(end-1),:);
-                        STORED_2d_vs_fits{m} = STORED_2d_vs_fits{m}(1:(end-1),:);
-                        STORED_2d_ro_fits{m} = STORED_2d_ro_fits{m}(1:(end-1),:);
-                        STORED_2d_hh_fits{m} = STORED_2d_hh_fits{m}(1:(end-1),:);
-                        STORED_2d_qp_fits{m} = STORED_2d_qp_fits{m}(1:(end-1),:);
-                        STORED_2d_qs_fits{m} = STORED_2d_qs_fits{m}(1:(end-1),:);
-                        STORED_2d_daf_fits{m}= STORED_2d_daf_fits{m}(1:(end-1),:);
-                        %[Single_Misfit, er];
-                        STORED_RESULTS_2d_misfit{m} = STORED_RESULTS_2d_misfit{m}(1:(end-1),:);
-                        %
-                        global_inversion_step = global_inversion_step-1;
-                        %
-                        STORED_RESULTS_2d_misfit_profile = STORED_RESULTS_2d_misfit_profile(1:(end-1),:);
-                        fprintf('WARNING: Inversion step[%d] failed! retrying.\n',(iii+1))
-                    else% inversion step is acceptable
-                        Store_Results(Energy,fullMisfit);
-                        togo = togo-1;
-                        set(T2_P1_max_it,'String', num2str( togo  ) );
-                        fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
-                        %pause
-                    end
-
-                %set(T2_P1_inv_button_sw,'String','START Inversion (SW)')
-                    pause(0.02);
-                end
-                set(T2_P1_inv_button_sw,'Value',0)
-                set(T2_P1_inv_button_sw,'String','START Inversion (SW)')
-                bgc = 0.9*[1 1 1];
-                set(T2_P1_inv_button_sw,'BackgroundColor',bgc);
-                set(T2_P1_progress,'String','');
-            else
-                fprintf('No data was loaded. Please load a project.\n')
+         if(isempty(FDAT))
+            fprintf('No data was loaded. Please load a project.\n')
+            return;
+         end
+         %
+        if ~isempty(inversion_is_started__global)
+            if(~strcmp(inversion_is_started__global,'SW'))
+               quest = 'It is not advisable to mix Body and Surface Waves inversions. Continue?';
+               answer = questdlg(quest);
+               if strcmp(answer,'No'); return; end
+               if strcmp(answer,'Cancel'); return; end
             end
-
         end
+        %
+        bgc = [1 0.5 0.1];
+        set(T2_P1_inv_button_sw,'BackgroundColor',bgc,'enable','off')
+        set(T2_P1_inv_button_bw,'enable','off')
+        %
+        set(h_fwd_bw ,'enable','off')
+        set(h_fwd_sw ,'enable','off')
+        %
+        set(T2_P1_inv_stop,'enable','on')
+        set(T2_P1_inv_stop,'string','STOP')
+        set(T2_P1_inv_stop,'BackgroundColor',bgc);
+        %
+        set(T2_P1_progress,'String',''); 
+        
+                
+        prev_MDLS = MDLS;
+        setup_dpth_weights();
+        %
+        %get curve x-ranges ids
+        xmin = str2double( get(h_scale_min,'String') );
+        xmax = str2double( get(h_scale_max,'String') );
+        ddx   = str2double( get(h_dscale,   'String') );
+        %[ixmin_id,ixmax_id] = 
+        get_curve_xindex_bounds(xmin,xmax);  
+        %
+        iii = 0;
+        
+        set(T2_P1_global_it_count,'String',strcat(num2str(global_inversion_step),' So far.'));
+        togo = str2double(get(T2_P1_max_it,'String'));
+        Nsurveys = size(SURVEYS,1);
+        inversion_is_started__global = 'SW'; 
+        the_best_energy  = min(BEST_ENERGIES);
+        misfit_vector = zeros(1,Nsurveys);% 190410 
+        % er_vector     = zeros(1,Nsurveys);% 190410 
+        while ( (Flag__stop_inversion==0) && (togo > 0) )
+          iii = iii+1;
+          if(iii == 1) 
+              last_MDLS = MDLS;
+          else
+              last_MDLS = perturbe_models(MDLS);
+          end
+          %last_FDAT = FDAT;% last_FDAT{m,1} = FDAT{m,1};
+          last_FDAT = FDAT;% last_FDAT{m,1} = FDAT{m,1};
+
+          %fullMisfit = 0;  %  190410
+          %fuller = 0; %       190410
+          fullCurve_term = 0;% 190410
+          fullSlope_term = 0;% 190410
+          for m = 1:Nsurveys
+              drawnow
+             %  set(T2_P1_progress,'String',num2str(Nsurveys+1-m));
+            %  vp  vs  rho  h  Qp  Qs
+            VP = last_MDLS{m}(:,1);
+            VS = last_MDLS{m}(:,2);
+            RO = last_MDLS{m}(:,3);
+            HH = last_MDLS{m}(:,4);
+            QP = last_MDLS{m}(:,5);
+            QS = last_MDLS{m}(:,6);
+            [FF,HV] = call_Albarello_2011(sw_nmodes, sw_nsmooth, ddx, xmax, HH,VP,VS,RO,QP,QS);
+            FF=flipud(FF);
+            HV=flipud(HV);
+
+            last_FDAT{m,1} = main_scale;
+            temphv = 0*main_scale;
+            temphv(ixmin_id:ixmax_id,1) = ( interp1(FF, HV, main_scale(ixmin_id:ixmax_id) ) );
+            last_FDAT{m,2} = temphv;%interp1(FF,HV,main_scale,'spline','extrap');
+            DAF = 0;
+            %% ========================================================
+            %% store
+            %[Single_Misfit,~,~,er] = get_single_model_misfit(m, last_FDAT{m,2} );
+            [Single_Misfit,Curve_term,Slope_term,er] = get_single_model_misfit(m, last_FDAT{m,2} );% 190410
+
+            STORED_2d_vp_fits{m} = [STORED_2d_vp_fits{m}; VP.'];
+            STORED_2d_vs_fits{m} = [STORED_2d_vs_fits{m}; VS.'];
+            STORED_2d_ro_fits{m} = [STORED_2d_ro_fits{m}; RO.'];
+            STORED_2d_hh_fits{m} = [STORED_2d_hh_fits{m}; HH.'];
+            STORED_2d_qp_fits{m} = [STORED_2d_qp_fits{m}; QP.'];
+            STORED_2d_qs_fits{m} = [STORED_2d_qs_fits{m}; QS.'];
+            STORED_2d_daf_fits{m}= [STORED_2d_daf_fits{m}; DAF];
+            %[Single_Misfit, er];
+            STORED_RESULTS_2d_misfit{m} = [STORED_RESULTS_2d_misfit{m}; [Single_Misfit,er]];
+            %fullMisfit = fullMisfit + Single_Misfit; % 190410
+            %fuller     = fuller + er; % 190410
+            fullCurve_term = fullCurve_term + Curve_term;% 190410
+            fullSlope_term = fullSlope_term + Slope_term;% 190410
+            misfit_vector(m) = Single_Misfit;% 190410
+            er_vector(m)     = er;% 190410
+            if(iii == 1) 
+                best_MISFIT_by_location(m) = Single_Misfit;% 190410
+            end
+          end
+          %% 190410 >>>>>>>> Keep only location with decreased energy
+%                   count =0;
+          for m = 1:Nsurveys
+              if (misfit_vector(m) >  best_MISFIT_by_location(m)) || isnan(misfit_vector(m))
+                % this model was not improved (revert to previous) 
+                misfit_vector(m)=  best_MISFIT_by_location(m);
+                last_MDLS{m}   = MDLS{m};
+                last_FDAT{m,1} = best_FDAT{m,1};
+%                         count = count+1;
+              end
+          end
+%                   if count>0
+%                       clc
+%                       fprintf('[%d]/%d were reverted\n',count,Nsurveys);
+%                       pause
+%                   end
+          fullMisfit = sum( misfit_vector );
+          fuller     = 0;
+          %% <<<<<<<< 190410                  
+          %% ==============================================================
+          global_inversion_step = global_inversion_step+1;
+          set(T2_P1_global_it_count,'String',num2str(global_inversion_step));
+
+          Rfit   = Regularize();
+          Energy =  fullMisfit + Rfit;
+          %fprintf('%d) ENERGY GAP[%f]pc    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,(100*(Energy-the_best_energy)/the_best_energy),fullMisfit,Rfit);
+
+          %% profile misfit
+          STORED_RESULTS_2d_misfit_profile = [STORED_RESULTS_2d_misfit_profile; [fullMisfit, fuller, Energy]];
+
+            if isnan(Energy)==1% then something went wrong and need correction
+                iii = iii-1;
+                %
+                STORED_2d_vp_fits{m} = STORED_2d_vp_fits{m}(1:(end-1),:);
+                STORED_2d_vs_fits{m} = STORED_2d_vs_fits{m}(1:(end-1),:);
+                STORED_2d_ro_fits{m} = STORED_2d_ro_fits{m}(1:(end-1),:);
+                STORED_2d_hh_fits{m} = STORED_2d_hh_fits{m}(1:(end-1),:);
+                STORED_2d_qp_fits{m} = STORED_2d_qp_fits{m}(1:(end-1),:);
+                STORED_2d_qs_fits{m} = STORED_2d_qs_fits{m}(1:(end-1),:);
+                STORED_2d_daf_fits{m}= STORED_2d_daf_fits{m}(1:(end-1),:);
+                %[Single_Misfit, er];
+                STORED_RESULTS_2d_misfit{m} = STORED_RESULTS_2d_misfit{m}(1:(end-1),:);
+                %
+                global_inversion_step = global_inversion_step-1;
+                %
+                STORED_RESULTS_2d_misfit_profile = STORED_RESULTS_2d_misfit_profile(1:(end-1),:);
+                fprintf('WARNING: Inversion step[%d] failed! retrying.\n',(iii+1))
+            else% inversion step is acceptable
+                %Store_Results(Energy,fullMisfit, fullCurve_term,  fullSlope_term);
+                Store_Results(Energy, fullMisfit, Rfit, fullCurve_term,  fullSlope_term, misfit_vector);% 190410
+                togo = togo-1;
+                set(T2_P1_max_it,'String', num2str( togo  ) );
+                %fprintf('%d) ENERGY[%f]    MISFIT[%f]  REGULARIZER[%f]\n',global_inversion_step,Energy,fullMisfit,Rfit);
+                fprintf('%d) ENERGY GAP[%f]pc    REGULARIZER/MISFIT[%f]   MISFIT/[%f]   REGULARIZER[%f]\n', ...
+                    global_inversion_step,(100*(Energy-the_best_energy)/the_best_energy), ...
+                    Rfit/fullMisfit, ...
+                    fullMisfit,Rfit);
+            end
+            pause(0.02);
+        end
+
+        bgc = 0.9*[1 1 1];
+        set(T2_P1_inv_button_sw,'BackgroundColor',bgc,'enable','on')
+        set(T2_P1_inv_button_bw,'enable','on')
+        %
+        set(h_fwd_bw ,'enable','on')
+        set(h_fwd_sw ,'enable','on')
+        %
+        set(T2_P1_inv_stop,'enable','off')
+        set(T2_P1_inv_stop,'string','')
+        set(T2_P1_inv_stop,'BackgroundColor',bgc);
+        Flag__stop_inversion=0;   
+    end
+    function B_stop_inversion(~,~,~)
+        bgc = [1 0 0];
+        set(T3_P1_inv_stop,'BackgroundColor',bgc);
+        set(T3_P1_inv_stop,'String','stopping');
+        set(T3_P1_inv_stop,'enable','off');
+        Flag__stop_inversion = 1;
+    end
+    function B_stop_inversion_all(~,~,~)
+        bgc = [1 0 0];
+        set(T2_P1_inv_stop,'BackgroundColor',bgc);
+        set(T2_P1_inv_stop,'String','stopping');
+        set(T3_P1_inv_stop,'enable','off');
+        Flag__stop_inversion = 1;
     end
 %% TAB-2, Panel-2
     function CM_hAx_cwf_modify(~,~,~)
@@ -3749,7 +3909,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                     weight_curv(tt,2) = value; 
                 end
             end
-            plot__curve_weights(hAx_cwf)
+            plot__curve_weights(0)
         end
         setup_curve_weights();
     end
@@ -3785,7 +3945,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                     weight_curv(tt,2) = N0*exp( -(ti-pt0)/tau); 
                 end
             end
-            plot__curve_weights(hAx_cwf)
+            plot__curve_weights(0)
         end
         setup_curve_weights();
     end
@@ -3800,19 +3960,19 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                end
             end
             weight_curv(:,2) = 1;
-            plot__curve_weights(hAx_cwf)
+            plot__curve_weights(0)
         end
     end
     function CM_hAx_cwf_show_lin(~,~,~)
         if(size(weight_curv,1) > 0)
             curve_weights_plotmode = 0;
-            plot__curve_weights(hAx_cwf)
+            plot__curve_weights(0)
         end
     end
     function CM_hAx_cwf_show_log(~,~,~)
         if(size(weight_curv,1) > 0)
             curve_weights_plotmode = 1;
-            plot__curve_weights(hAx_cwf)
+            plot__curve_weights(0)
         end
     end
 %% TAB-2, Panel-3
@@ -3849,7 +4009,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             end
             
             
-            plot__depth_weights()
+            plot__depth_weights(0)
         end
         setup_dpth_weights();
     end
@@ -3864,22 +4024,22 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                end
             end
             weight_dpth(:,2) = 1;
-            plot__depth_weights()
+            plot__depth_weights(0)
         end
     end
     function CM_hAx_dwf_show_lin(~,~,~)
         if(size(weight_dpth,1) > 0)
             depth_weights_plotmode = 0;
-            plot__curve_weights(hAx_cwf)
+            plot__curve_weights(0)
         end
     end
     function CM_hAx_dwf_show_log(~,~,~)
         if(size(weight_dpth,1) > 0)
             depth_weights_plotmode = 1;
-            plot__depth_weights()
+            plot__depth_weights(0)
         end
     end
-%% TAB-3: =================================================
+%% TAB-3: =================================================  Inversion (Local)
 %% TAB-3, Panel-1
     function B_lock_model(~,~,~)
         if (0 < P.isshown.id) && (P.isshown.id < length(TO_INVERT))
@@ -3899,49 +4059,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             end
         end
     end
-%%     function BT_insert_break(~,~,~)
-%         %[xval,~] = ginput(1);
-%         if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
-%             [xval,~] = sam2018b_ginput(1);
-%         else
-%             [xval,~] = ginput(1);
-%         end
-%         %;% take points
-%         for m = 2:size(SURVEYS,1)
-%             x0 = SURVEYS{m-1,1}(1);
-%             x1 = SURVEYS{m,1}(1);
-%             XX = xval;
-%             if(x0<XX && XX<x1) 
-%                 BREAKS(m) = 1;
-%                 fprintf('Break inserted between %d and %d\n',(m-1),m)
-%             end
-%         end
-%         warning('For now, Breaks are only valid along X.')
-%Update_survey_locations(hAx_main_geo);
-%         Update_survey_locations(hAx_geo);
-%     end
-%%     function BT_delete_breaks(~,~,~)
-%         %[xval,~] = ginput(1);
-%         if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
-%             [xval,~] = sam2018b_ginput(1);
-%         else
-%             [xval,~] = ginput(1);
-%         end
-%         %;% take points
-%         for m = 2:size(SURVEYS,1)
-%             x0 = SURVEYS{m-1,1}(1);
-%             x1 = SURVEYS{m,1}(1);
-%             XX = xval;
-%             if(x0<XX && XX<x1) 
-%                 BREAKS(m) = 0;
-%                 fprintf('Break removed between %d and %d\n',(m-1),m)
-%             end
-%         end
-%         warning('For now, Breaks are only valid along X.')
-%Update_survey_locations(hAx_main_geo);
-%         Update_survey_locations(hAx_geo);
-%     end
-%%
+    %
     function define_Profile(~,~,~)
         if isempty(SURVEYS); return; end
         Np = size(receiver_locations,1);
@@ -4107,7 +4225,6 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         delete(lne);
     end
     function reset_Profile(~,~,~)
-        hAx_main_geo = hAx_geo;%   compatibility
         if isempty(SURVEYS); return; end
         P.profile_line = {};
         P.profile_ids  = {};
@@ -4118,7 +4235,6 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         Update_survey_locations(hAx_geo)
     end
     function reset_one_Profile(~,~,~)
-        hAx_main_geo = hAx_geo;%   compatibility
         if isempty(SURVEYS); return; end
         if isempty(P.profile_ids); return; end
         if size(P.profile_ids,1)<2
@@ -4159,8 +4275,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         %  
         Update_survey_locations(hAx_main_geo);
         Update_survey_locations(hAx_geo)
-    end
-    
+    end   
 %% TAB-3, Panel-2: data
     function CM_hAx_dat_disable(~,~,~)
        [boxx,boxy] = getsquare();
@@ -4171,23 +4286,23 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
        else
            DISCARDS{P.isshown.id} = [ DISCARDS{P.isshown.id}; new_discards]; 
        end
-       Show_survey(hAx_dat);
+       Show_survey(0);
     end
     function CM_hAx_dat_enable(~,~,~)
        DISCARDS{P.isshown.id} = [];
-       Show_survey(hAx_dat);
+       Show_survey(0);
        %DISCARDS{P.isshown.id}%------------------------------------------ FIX  need to be more efficient
     end
     function CM_hAx_dat_show_lin(~,~,~)
         if(size(weight_curv,1) > 0)
             curve_plotmode = 0;
-            Show_survey(hAx_dat)
+            Show_survey(0)
         end
     end
     function CM_hAx_dat_show_log(~,~,~)
         if(size(weight_curv,1) > 0)
             curve_plotmode = 1;
-            Show_survey(hAx_dat)
+            Show_survey(0)
         end
     end
 %% TAB-3, Panel-3: model
@@ -4196,7 +4311,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         model_manager( get(hTab_mod,'Data') );
         set(hTab_mod,'Data', MDLS{P.isshown.id});
     end
-%% TAB-3, Panel-4: Inversion
+%% TAB-3, Panel-4: local inversion
     function CM_hAx_keep_and_spread_model(~,~,~)
         for ii = 1:size(SURVEYS,1)
             if(ii ~= P.isshown.id)
@@ -4244,7 +4359,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
 
         MDLS{P.isshown.id} = newm;
         
-        Show_survey(hAx_dat);
+        Show_survey(0);
         hold(hAx_1dprof,'off');
         draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
             
@@ -4286,7 +4401,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                 
                 %Update_survey_locations(hAx_geo);
                 %Update_survey_locations(hAx_main_geo);
-                Show_survey(hAx_dat);
+                Show_survey(0);
                 %plot_1d_profile(hAx_1dprof);
 
                 hold(hAx_1dprof,'off');
@@ -4330,7 +4445,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                 
                 %Update_survey_locations(hAx_geo);
                 %Update_survey_locations(hAx_main_geo);
-                Show_survey(hAx_dat);
+                Show_survey(0);
                 %plot_1d_profile(hAx_1dprof);
 
                 hold(hAx_1dprof,'off');
@@ -4350,7 +4465,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             P.isshown.id = str2double(answer);
             Update_survey_locations(hAx_main_geo);
             Update_survey_locations(hAx_geo);
-            Show_survey(hAx_dat);
+            Show_survey(0);
         end
     end
     function CM_hAx_geo_disable(~,~,~)
@@ -4367,254 +4482,321 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             Update_survey_locations(hAx_geo);   
         end
     end
-    function B_start_inversion__independently(hObject,~,~)
-       if(~isempty(FDAT) && P.isshown.id)  
-           if ~isempty(inversion_is_started__inedipendent)
-               if(~strcmp(inversion_is_started__inedipendent,'BW'))
-                   quest = 'It is not advisable to mix Body and Surface Waves inversions. Continue?';
-                   answer = questdlg(quest);
-                   if strcmp(answer,'No'); return; end
-                   if strcmp(answer,'Cancel'); return; end
-               end
-           end
-           bgc = [1 0.5 0.1];
-           set(hObject,'BackgroundColor',bgc);
-           x_vec = get_x_ranges();
-
-            %% init
-            last_single_MDL = MDLS{P.isshown.id};
-            last_single_FDAT{1,1} = main_scale;
-
-            init_single_FDAT = cell(1,2);
-            init_single_FDAT{1,1} = main_scale;
-            
-            %% cycle
-            previous_iii = independent_optimiazation_cicles(P.isshown.id);
-            iii = 0;
-            iii_global = previous_iii;
-            %
-            set(hObject,'String','STOP')  
-            togo = str2double(get(T3_P1_max_it,'String'));
-            
-            if(TO_INVERT(P.isshown.id) == 1)%                               Assuming model is not locked  
-                inversion_is_started__inedipendent= 'BW';
-                while (get(hObject,'Value') && (togo > 0) )
-                    
-                    iii = iii+1;
-                    %fprintf('ITER[%d]\n',iii);
-                    iii_global = previous_iii + iii;
-                    set(T3_P1_it_count,'String',num2str(iii_global));
-                    if(iii > 1) 
-                        % iii == 1 is always the initial model evaluation
-                        %clc
-                        
-                        last_single_MDL = perturbe_single_model( MDLS{P.isshown.id} );
-                        %fprintf('perturbed!   %f\n',max(max( abs(MDLS{P.isshown.id}-last_single_MDL) )))
-                        %pause
-                    %else
-                    %    fprintf('model not perturbed\n')
-                    end
-                    %fprintf('%d][C] perturbation [%f][%f][%f][%f][%f][%f]\n',iii, max( abs(MDLS{P.isshown.id}-last_single_MDL) ) );
-                    %pause
-                    
-                    nc = 2;%size(FDAT,2);
-                    last_single_FDAT = cell(1,nc); 
-
-                    %% ====================================================
-                    OUT1 = single_fwd_model(last_single_MDL,x_vec);% this substitutes the commented code
-                    last_single_FDAT{1} = OUT1{1};
-                    last_single_FDAT{2} = OUT1{2};
-                    [DAF] = get_amplification_factor(OUT1{1},OUT1{4});
-                    
-                    if(iii == 1)
-                        init_single_FDAT{1,1} = last_single_FDAT{1,1};%                         this single optimization section: inittial model
-                        init_single_FDAT{1,2} = last_single_FDAT{1,2};%                         this single optimization section: inittial model
-                    end
-                    %% ====================================================
-                    %
-                    for j = 1:nc; last_FDAT{P.isshown.id,j} = last_single_FDAT{1,j}; end
-                    %           
-                    [Single_Misfit, ctrm, strm, er] = get_single_model_misfit(P.isshown.id, last_single_FDAT{2} );
-                    %fprintf('MOD[%d]   MISFIT[%f]\n',P.isshown.id,Single_Misfit);
-                    %
-                    %% results storage           
-                    Store_Single_Result(Single_Misfit,last_single_MDL, ctrm, strm);
-                    STORED_RESULTS_1d_misfit{P.isshown.id} = [STORED_RESULTS_1d_misfit{P.isshown.id}; [Single_Misfit, er]];
-                    STORED_1d_vp_fits{P.isshown.id} = [STORED_1d_vp_fits{P.isshown.id}; last_single_MDL(:,1).'];% VP.'];
-                    STORED_1d_vs_fits{P.isshown.id} = [STORED_1d_vs_fits{P.isshown.id}; last_single_MDL(:,2).'];% VS.'];
-                    STORED_1d_ro_fits{P.isshown.id} = [STORED_1d_ro_fits{P.isshown.id}; last_single_MDL(:,3).'];% RO.'];
-                    STORED_1d_hh_fits{P.isshown.id} = [STORED_1d_hh_fits{P.isshown.id}; last_single_MDL(:,4).'];% HH.'];
-                    STORED_1d_qp_fits{P.isshown.id} = [STORED_1d_qp_fits{P.isshown.id}; last_single_MDL(:,5).'];% QP.'];
-                    STORED_1d_qs_fits{P.isshown.id} = [STORED_1d_qs_fits{P.isshown.id}; last_single_MDL(:,6).'];% QS.'];
-                    STORED_1d_daf_fits{P.isshown.id}= [STORED_1d_daf_fits{P.isshown.id}; DAF];
-                    %
-                    %
-                    togo = togo-1;
-                    set(T3_P1_max_it,'String', num2str( togo  ) );
-                    pause(0.002);
-                end
-                
-                Show_survey(hAx_dat);
-                hold(hAx_1dprof,'off')
-                draw_1d_profile(hAx_1dprof, vfst_MDLS{P.isshown.id},'b',1);
-                draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
-                %plot_1d_profile(hAx_1dprof);
-                hold(hAx_1dprof,'off')
-                draw_Misfit_vs_it(H.gui, hAx_MvsIT);
-                
-                independent_optimiazation_cicles(P.isshown.id) =  iii_global;
-                set(hObject,'Value',0)
-                set(T3_P1_it_count,'String',strcat( num2str(iii_global),' so far'));
-            else
-                if(TO_INVERT(P.isshown.id) == 0); msgbox('THIS MODEL IS NOT IN USE','Communication','warn'); end
-                if(TO_INVERT(P.isshown.id) == 2); msgbox('THIS MODEL IS LOCKED.',   'Communication','warn'); end
-            end
-            set(hObject,'Value',0)
-            set(hObject,'String','Optimize (P/S)')
-       else
-            %fprintf('No data was loaded. Please load a project.\n')
+    function B_start_inversion__independently(~,~,~)
+        if(isempty(FDAT) || P.isshown.id==0)
+           %fprintf('No data was loaded. Please load a project.\n')
             message = 'No data was loaded or no data was selected';
             msgbox(message,'Warning');
-            set(hObject,'Value',0)
-           
+           return;
+        end
+
+       if(TO_INVERT(P.isshown.id) ~= 1)%                               Assuming model is not locked 
+           if(TO_INVERT(P.isshown.id) == 0); msgbox('THIS MODEL IS NOT IN USE','Communication','warn'); end
+           if(TO_INVERT(P.isshown.id) == 2); msgbox('THIS MODEL IS LOCKED.',   'Communication','warn'); end
        end
-       %set(hAx_geo_hcmenu, 'Visible','on'); 
-       set(h_1d_prev,      'Enable','on'); 
-       set(h_1d_next,      'Enable','on'); 
-       set(T3_p1_revert,   'Enable','on');
+       if ~isempty(inversion_is_started__inedipendent)
+           if(~strcmp(inversion_is_started__inedipendent,'BW'))
+               quest = 'It is not advisable to mix Body and Surface Waves inversions. Continue?';
+               answer = questdlg(quest);
+               if strcmp(answer,'No'); return; end
+               if strcmp(answer,'Cancel'); return; end
+           end
+       end
+       bgc = [1 0.5 0.1];
+       set(T3_P1_inv,'BackgroundColor',bgc,'enable','off')
+        set(T3_P1_invSW,'enable','off')
+        %
+        set(T3_p1_revert,'enable','off')
+        set(h_1d_spreadALL,'enable','off')
+        set(h_1d_spreadR,'enable','off')
+        set(h_1d_spreadL,'enable','off')
+        set(h_1d_next,'enable','off') 
+        set(h_1d_prev,'enable','off')
+        set(h_1d_spreadTO,'enable','off')
+        set(h_1d_disable,'enable','off')
+        set(h_1d_enable,'enable','off')
+        set(h_1d_Lock,'enable','off')
+        set(h_1d_Unlock,'enable','off')
+        %
+        set(T3_P1_inv_stop,'enable','on')
+        set(T3_P1_inv_stop,'string','STOP')
+        set(T3_P1_inv_stop,'BackgroundColor',bgc);
+       x_vec = get_x_ranges();
+        %% init
+        last_single_MDL = MDLS{P.isshown.id};
+        last_single_FDAT{1,1} = main_scale;
+
+        init_single_FDAT = cell(1,2);
+        init_single_FDAT{1,1} = main_scale;            
+        %% cycle
+        previous_iii = independent_optimiazation_cicles(P.isshown.id);
+        iii = 0;
+        iii_global = previous_iii;
+        %
+        togo = str2double(get(T3_P1_max_it,'String'));
+
+        inversion_is_started__inedipendent= 'BW';
+        while (Flag__stop_inversion==0) && (togo > 0)%(get(hObject,'Value') && (togo > 0) )%while (get(hObject,'Value') && (togo > 0) )
+
+            iii = iii+1;
+            %fprintf('ITER[%d]\n',iii);
+            iii_global = previous_iii + iii;
+            set(T3_P1_it_count,'String',num2str(iii_global));
+            if(iii > 1) 
+                % iii == 1 is always the initial model evaluation
+                %clc
+
+                last_single_MDL = perturbe_single_model( MDLS{P.isshown.id} );
+                %fprintf('perturbed!   %f\n',max(max( abs(MDLS{P.isshown.id}-last_single_MDL) )))
+                %pause
+            %else
+            %    fprintf('model not perturbed\n')
+            end
+            %fprintf('%d][C] perturbation [%f][%f][%f][%f][%f][%f]\n',iii, max( abs(MDLS{P.isshown.id}-last_single_MDL) ) );
+            %pause
+
+            nc = 2;%size(FDAT,2);
+            last_single_FDAT = cell(1,nc); 
+
+            %% ====================================================
+            OUT1 = single_fwd_model(last_single_MDL,x_vec);% this substitutes the commented code
+            last_single_FDAT{1} = OUT1{1};
+            last_single_FDAT{2} = OUT1{2};
+            [DAF] = get_amplification_factor(OUT1{1},OUT1{4});
+
+            if(iii == 1)
+                init_single_FDAT{1,1} = last_single_FDAT{1,1};%                         this single optimization section: inittial model
+                init_single_FDAT{1,2} = last_single_FDAT{1,2};%                         this single optimization section: inittial model
+            end
+            %% ====================================================
+            %
+            for j = 1:nc; last_FDAT{P.isshown.id,j} = last_single_FDAT{1,j}; end
+            %           
+            [Single_Misfit, ctrm, strm, er] = get_single_model_misfit(P.isshown.id, last_single_FDAT{2} );
+            %fprintf('MOD[%d]   MISFIT[%f]\n',P.isshown.id,Single_Misfit);
+            %
+            %% results storage           
+            Store_Single_Result(Single_Misfit,last_single_MDL, ctrm, strm);
+            STORED_RESULTS_1d_misfit{P.isshown.id} = [STORED_RESULTS_1d_misfit{P.isshown.id}; [Single_Misfit, er]];
+            STORED_1d_vp_fits{P.isshown.id} = [STORED_1d_vp_fits{P.isshown.id}; last_single_MDL(:,1).'];% VP.'];
+            STORED_1d_vs_fits{P.isshown.id} = [STORED_1d_vs_fits{P.isshown.id}; last_single_MDL(:,2).'];% VS.'];
+            STORED_1d_ro_fits{P.isshown.id} = [STORED_1d_ro_fits{P.isshown.id}; last_single_MDL(:,3).'];% RO.'];
+            STORED_1d_hh_fits{P.isshown.id} = [STORED_1d_hh_fits{P.isshown.id}; last_single_MDL(:,4).'];% HH.'];
+            STORED_1d_qp_fits{P.isshown.id} = [STORED_1d_qp_fits{P.isshown.id}; last_single_MDL(:,5).'];% QP.'];
+            STORED_1d_qs_fits{P.isshown.id} = [STORED_1d_qs_fits{P.isshown.id}; last_single_MDL(:,6).'];% QS.'];
+            STORED_1d_daf_fits{P.isshown.id}= [STORED_1d_daf_fits{P.isshown.id}; DAF];
+            %
+            %
+            togo = togo-1;
+            set(T3_P1_max_it,'String', num2str( togo  ) );
+            %pause(0.002);
+            drawnow
+        end
+
+        Show_survey(0);
+        hold(hAx_1dprof,'off')
+        draw_1d_profile(hAx_1dprof, vfst_MDLS{P.isshown.id},'b',1);
+        draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
+        %plot_1d_profile(hAx_1dprof);
+        hold(hAx_1dprof,'off')
+        draw_Misfit_vs_it(0);
+
+        independent_optimiazation_cicles(P.isshown.id) =  iii_global;
+         set(T3_P1_it_count,'String',strcat( num2str(iii_global),' so far'));
+       %
+        set(T3_p1_revert,'enable','on')
+        set(h_1d_spreadALL,'enable','on')
+        set(h_1d_spreadR,'enable','on')
+        set(h_1d_spreadL,'enable','on')
+        set(h_1d_next,'enable','on') 
+        set(h_1d_prev,'enable','on')
+        set(h_1d_spreadTO,'enable','on')
+        set(h_1d_disable,'enable','on')
+        set(h_1d_enable,'enable','on')
+        set(h_1d_Lock,'enable','on')
+        set(h_1d_Unlock,'enable','on')
+        %
        bgc = 0.9*[1 1 1];
-       set(hObject,'BackgroundColor',bgc);
+       set(T3_P1_inv,'BackgroundColor',bgc,'enable','on')
+        set(T3_P1_invSW,'enable','on')
+        %
+       set(T3_P1_inv_stop,'enable','off')
+       set(T3_P1_inv_stop,'string','')
+       set(T3_P1_inv_stop,'BackgroundColor',bgc);
+       Flag__stop_inversion=0;
     end
-    function B_start_inversion__independently_SW(hObject,~,~)
-       if(~isempty(FDAT) && P.isshown.id)
-           if ~isempty(inversion_is_started__inedipendent)
-               if(~strcmp(inversion_is_started__inedipendent,'SW'))
-                   quest = 'It is not advisable to mix Body and Surface Waves inversions. Continue?';
-                   answer = questdlg(quest);
-                   if strcmp(answer,'No'); return; end
-                   if strcmp(answer,'Cancel'); return; end
-               end
-           end
-            bgc = [1 0.5 0.1];
-            set(hObject,'BackgroundColor',bgc);
-            get_x_ranges();
-            xmax = str2double( get(h_scale_max,'String') );
-            ddx   = str2double( get(h_dscale,  'String') );
-            %% init
-            last_single_MDL = MDLS{P.isshown.id};
-            last_single_FDAT{1,1} = main_scale;
-
-            init_single_FDAT = cell(1,2);
-            init_single_FDAT{1,1} = main_scale;
-            
-            %% cycle
-            previous_iii = independent_optimiazation_cicles(P.isshown.id);
-            iii = 0;
-            iii_global = previous_iii;
-            %
-            set(hObject,'String','STOP')  
-            togo = str2double(get(T3_P1_max_it,'String'));
-            
-            if(TO_INVERT(P.isshown.id) == 1)%                               Assuming model is not locked  
-                inversion_is_started__inedipendent= 'SW';
-                while (get(hObject,'Value') && (togo > 0) )
-                    
-                    iii = iii+1;
-                    %fprintf('ITER[%d]\n',iii);
-                    iii_global = previous_iii + iii;
-                    set(T3_P1_it_count,'String',num2str(iii_global));
-                    if(iii > 1) 
-                        % iii == 1 is always the initial model evaluation
-                        %clc
-                        last_single_MDL = perturbe_single_model( MDLS{P.isshown.id} );
-                        %fprintf('perturbed!   %f\n',max(max( abs(MDLS{P.isshown.id}-last_single_MDL) )))
-                        %pause
-                    %else
-                    %    fprintf('model not perturbed\n')
-                    end
-                    %fprintf('%d][C] perturbation [%f][%f][%f][%f][%f][%f]\n',iii, max( abs(MDLS{P.isshown.id}-last_single_MDL) ) );
-                    %pause
-                    
-                    nc = 2;%size(FDAT,2);
-                    last_single_FDAT = cell(1,nc); 
-
-                    %%-------------------------------------------------
-                    %%% OUT1 = single_fwd_model(last_single_MDL,x_vec);% this substitutes the commented code
-                    %                     %  vp  vs  rho  h  Qp  Qs
-                    vp = last_single_MDL(:,1);
-                    vs = last_single_MDL(:,2);
-                    ro = last_single_MDL(:,3);
-                    hz = last_single_MDL(:,4);
-                    qp = last_single_MDL(:,5);
-                    qs = last_single_MDL(:,6);
-                    [FF,HV] = call_Albarello_2011(sw_nmodes, sw_nsmooth, ddx, xmax, hz,vp,vs,ro,qp,qs);
-                    FF=flipud(FF);
-                    HV=flipud(HV);
-                    
-                    last_single_FDAT{1} = main_scale;
-                    temphv = 0*main_scale;
-                    temphv(ixmin_id:ixmax_id,1) = ( interp1(FF, HV, main_scale(ixmin_id:ixmax_id) ) );
-                    last_single_FDAT{2} = temphv;%interp1(FF,HV,main_scale,'spline','extrap');
-                    DAF = 0;
-                    
-                    if(iii == 1)
-                        init_single_FDAT{1,1} = last_single_FDAT{1,1};%                         this single optimization section: inittial model
-                        init_single_FDAT{1,2} = last_single_FDAT{1,2};%                         this single optimization section: inittial model
-                    end
-                    %% ====================================================
-                    %
-                    for j = 1:nc; last_FDAT{P.isshown.id,j} = last_single_FDAT{1,j}; end
-                    %           
-                    [Single_Misfit, ctrm, strm, er] = get_single_model_misfit(P.isshown.id, last_single_FDAT{2} );
-                    %fprintf('MOD[%d]   MISFIT[%f]\n',P.isshown.id,Single_Misfit);
-                    %
-                    %% results storage           
-                    Store_Single_Result(Single_Misfit,last_single_MDL, ctrm, strm);
-                    STORED_RESULTS_1d_misfit{P.isshown.id} = [STORED_RESULTS_1d_misfit{P.isshown.id}; [Single_Misfit, er]];
-                    STORED_1d_vp_fits{P.isshown.id} = [STORED_1d_vp_fits{P.isshown.id}; last_single_MDL(:,1).'];% VP.'];
-                    STORED_1d_vs_fits{P.isshown.id} = [STORED_1d_vs_fits{P.isshown.id}; last_single_MDL(:,2).'];% VS.'];
-                    STORED_1d_ro_fits{P.isshown.id} = [STORED_1d_ro_fits{P.isshown.id}; last_single_MDL(:,3).'];% RO.'];
-                    STORED_1d_hh_fits{P.isshown.id} = [STORED_1d_hh_fits{P.isshown.id}; last_single_MDL(:,4).'];% HH.'];
-                    STORED_1d_qp_fits{P.isshown.id} = [STORED_1d_qp_fits{P.isshown.id}; last_single_MDL(:,5).'];% QP.'];
-                    STORED_1d_qs_fits{P.isshown.id} = [STORED_1d_qs_fits{P.isshown.id}; last_single_MDL(:,6).'];% QS.'];
-                    STORED_1d_daf_fits{P.isshown.id}= [STORED_1d_daf_fits{P.isshown.id}; DAF];
-                    %
-                    %
-                    togo = togo-1;
-                    set(T3_P1_max_it,'String', num2str( togo  ) );
-                    pause(0.02);
-                end
-                
-                Show_survey(hAx_dat);
-                hold(hAx_1dprof,'off')
-                draw_1d_profile(hAx_1dprof, vfst_MDLS{P.isshown.id},'b',1);
-                draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
-                %plot_1d_profile(hAx_1dprof);
-                hold(hAx_1dprof,'off')
-                draw_Misfit_vs_it(H.gui, hAx_MvsIT);
-                
-                independent_optimiazation_cicles(P.isshown.id) =  iii_global;
-                set(hObject,'Value',0)
-                set(T3_P1_it_count,'String',strcat( num2str(iii_global),' so far'));
-            else
-                if(TO_INVERT(P.isshown.id) == 0); msgbox('THIS MODEL IS NOT IN USE','Communication','warn'); end
-                if(TO_INVERT(P.isshown.id) == 2); msgbox('THIS MODEL IS LOCKED.',   'Communication','warn'); end
-            end
-            set(hObject,'Value',0)
-            set(hObject,'String','Optimize (SW)')
-       else
-            %fprintf('No data was loaded. Please load a project.\n')
+    function B_start_inversion__independently_SW(~,~,~)
+       if(isempty(FDAT) || P.isshown.id==0)
+           %fprintf('No data was loaded. Please load a project.\n')
             message = 'No data was loaded or no data was selected';
             msgbox(message,'Warning');
-            set(hObject,'Value',0)
-           
+           return;
        end
-       %set(hAx_geo_hcmenu, 'Visible','on'); 
-       set(h_1d_prev,      'Enable','on'); 
-       set(h_1d_next,      'Enable','on'); 
-       set(T3_p1_revert,   'Enable','on'); 
+       if(TO_INVERT(P.isshown.id) ~= 1)%                               Assuming model is not locked 
+           if(TO_INVERT(P.isshown.id) == 0); msgbox('THIS MODEL IS NOT IN USE','Communication','warn'); end
+           if(TO_INVERT(P.isshown.id) == 2); msgbox('THIS MODEL IS LOCKED.',   'Communication','warn'); end
+       end
+       if ~isempty(inversion_is_started__inedipendent)
+           if(~strcmp(inversion_is_started__inedipendent,'SW'))
+               quest = 'It is not advisable to mix Body and Surface Waves inversions. Continue?';
+               answer = questdlg(quest);
+               if strcmp(answer,'No'); return; end
+               if strcmp(answer,'Cancel'); return; end
+           end
+       end
+        bgc = [1 0.5 0.1];
+        set(T3_P1_invSW,'BackgroundColor',bgc,'enable','off')
+        set(T3_P1_inv,'enable','off')
+        %
+        set(T3_p1_revert,'enable','off')
+        set(h_1d_spreadALL,'enable','off')
+        set(h_1d_spreadR,'enable','off')
+        set(h_1d_spreadL,'enable','off')
+        set(h_1d_next,'enable','off') 
+        set(h_1d_prev,'enable','off')
+        set(h_1d_spreadTO,'enable','off')
+        set(h_1d_disable,'enable','off')
+        set(h_1d_enable,'enable','off')
+        set(h_1d_Lock,'enable','off')
+        set(h_1d_Unlock,'enable','off')
+        %
+        set(T3_P1_inv_stop,'enable','on')
+        set(T3_P1_inv_stop,'string','STOP')
+        set(T3_P1_inv_stop,'BackgroundColor',bgc);
+        get_x_ranges();
+        xmax = str2double( get(h_scale_max,'String') );
+        ddx   = str2double( get(h_dscale,  'String') );
+        %% init
+        last_single_MDL = MDLS{P.isshown.id};
+        last_single_FDAT{1,1} = main_scale;
+
+        init_single_FDAT = cell(1,2);
+        init_single_FDAT{1,1} = main_scale;            
+        %% cycle
+        previous_iii = independent_optimiazation_cicles(P.isshown.id);
+        iii = 0;
+        iii_global = previous_iii;
+        %
+        togo = str2double(get(T3_P1_max_it,'String'));
+
+        inversion_is_started__inedipendent= 'SW';
+        while (Flag__stop_inversion==0) && (togo > 0)%(get(hObject,'Value') && (togo > 0) )
+
+            iii = iii+1;
+            %fprintf('ITER[%d]\n',iii);
+            iii_global = previous_iii + iii;
+            set(T3_P1_it_count,'String',num2str(iii_global));
+            if(iii > 1) 
+                % iii == 1 is always the initial model evaluation
+                %clc
+                last_single_MDL = perturbe_single_model( MDLS{P.isshown.id} );
+                %fprintf('perturbed!   %f\n',max(max( abs(MDLS{P.isshown.id}-last_single_MDL) )))
+                %pause
+            %else
+            %    fprintf('model not perturbed\n')
+            end
+            %fprintf('%d][C] perturbation [%f][%f][%f][%f][%f][%f]\n',iii, max( abs(MDLS{P.isshown.id}-last_single_MDL) ) );
+            %pause
+
+            nc = 2;%size(FDAT,2);
+            last_single_FDAT = cell(1,nc); 
+
+            %%-------------------------------------------------
+            %%% OUT1 = single_fwd_model(last_single_MDL,x_vec);% this substitutes the commented code
+            %                     %  vp  vs  rho  h  Qp  Qs
+            vp = last_single_MDL(:,1);
+            vs = last_single_MDL(:,2);
+            ro = last_single_MDL(:,3);
+            hz = last_single_MDL(:,4);
+            qp = last_single_MDL(:,5);
+            qs = last_single_MDL(:,6);
+            [FF,HV] = call_Albarello_2011(sw_nmodes, sw_nsmooth, ddx, xmax, hz,vp,vs,ro,qp,qs);
+            FF=flipud(FF);
+            HV=flipud(HV);
+
+            last_single_FDAT{1} = main_scale;
+            temphv = 0*main_scale;
+            temphv(ixmin_id:ixmax_id,1) = ( interp1(FF, HV, main_scale(ixmin_id:ixmax_id) ) );
+            % mend issues
+            [rnan,~] = find(isnan(temphv)==1);
+            if ~isempty(rnan)
+                for p=rnan
+                    %p
+                    if p==1; temphv(p)=0;end
+                    if p>1; temphv(p)=temphv(p-1);end
+                end
+            end
+            last_single_FDAT{2} = temphv;%interp1(FF,HV,main_scale,'spline','extrap');
+            DAF = 0;
+
+            if(iii == 1)
+                init_single_FDAT{1,1} = last_single_FDAT{1,1};%                         this single optimization section: inittial model
+                init_single_FDAT{1,2} = last_single_FDAT{1,2};%                         this single optimization section: inittial model
+            end
+            %% ====================================================
+            %
+            for j = 1:nc; last_FDAT{P.isshown.id,j} = last_single_FDAT{1,j}; end
+            %           
+            [Single_Misfit, ctrm, strm, er] = get_single_model_misfit(P.isshown.id, last_single_FDAT{2} );
+            %fprintf('MOD[%d]   MISFIT[%f]\n',P.isshown.id,Single_Misfit);
+            %
+            %% results storage        
+            if ~isnan(Single_Misfit)
+                Store_Single_Result(Single_Misfit,last_single_MDL, ctrm, strm);
+                STORED_RESULTS_1d_misfit{P.isshown.id} = [STORED_RESULTS_1d_misfit{P.isshown.id}; [Single_Misfit, er]];
+                STORED_1d_vp_fits{P.isshown.id} = [STORED_1d_vp_fits{P.isshown.id}; last_single_MDL(:,1).'];% VP.'];
+                STORED_1d_vs_fits{P.isshown.id} = [STORED_1d_vs_fits{P.isshown.id}; last_single_MDL(:,2).'];% VS.'];
+                STORED_1d_ro_fits{P.isshown.id} = [STORED_1d_ro_fits{P.isshown.id}; last_single_MDL(:,3).'];% RO.'];
+                STORED_1d_hh_fits{P.isshown.id} = [STORED_1d_hh_fits{P.isshown.id}; last_single_MDL(:,4).'];% HH.'];
+                STORED_1d_qp_fits{P.isshown.id} = [STORED_1d_qp_fits{P.isshown.id}; last_single_MDL(:,5).'];% QP.'];
+                STORED_1d_qs_fits{P.isshown.id} = [STORED_1d_qs_fits{P.isshown.id}; last_single_MDL(:,6).'];% QS.'];
+                STORED_1d_daf_fits{P.isshown.id}= [STORED_1d_daf_fits{P.isshown.id}; DAF];
+                %
+                %
+                togo = togo-1;
+                set(T3_P1_max_it,'String', num2str( togo  ) );
+            else
+                fprintf('Retrying it %d\n',iii)
+                iii=iii-1;
+            end
+            if(Flag__stop_inversion==1); break; end
+            drawnow%pause(0.002);
+        end
+
+        Show_survey(0);
+        hold(hAx_1dprof,'off')
+        draw_1d_profile(hAx_1dprof, vfst_MDLS{P.isshown.id},'b',1);
+        draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
+        %plot_1d_profile(hAx_1dprof);
+        hold(hAx_1dprof,'off')
+        draw_Misfit_vs_it(0);
+
+        independent_optimiazation_cicles(P.isshown.id) =  iii_global;
+        set(T3_P1_it_count,'String',strcat( num2str(iii_global),' so far'));
+       
+        %
+        set(T3_p1_revert,'enable','on')
+        set(h_1d_spreadALL,'enable','on')
+        set(h_1d_spreadR,'enable','on')
+        set(h_1d_spreadL,'enable','on')
+        set(h_1d_next,'enable','on') 
+        set(h_1d_prev,'enable','on')
+        set(h_1d_spreadTO,'enable','on')
+        set(h_1d_disable,'enable','on')
+        set(h_1d_enable,'enable','on')
+        set(h_1d_Lock,'enable','on')
+        set(h_1d_Unlock,'enable','on')
+        %
+       
+       
        bgc = 0.9*[1 1 1];
-       set(hObject,'BackgroundColor',bgc);
+       set(T3_P1_invSW,'BackgroundColor',bgc,'enable','on')
+        set(T3_P1_inv,'enable','on')
+        %
+       set(T3_P1_inv_stop,'enable','off')
+       set(T3_P1_inv_stop,'string','')
+       set(T3_P1_inv_stop,'BackgroundColor',bgc);
+       Flag__stop_inversion=0;
     end    
     function B_revert_1d(~,~,~)
         if(~isempty(FDAT))
@@ -4630,7 +4812,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
 
             %B_start_model();
             last_FDAT = multiple_fwd_model();
-            Show_survey(hAx_dat);
+            Show_survey(0);
         else
             fprintf('No data was loaded. Please load a project.\n')
         end
@@ -4641,21 +4823,20 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         %plot_1d_profile(hAx_1dprof);
         hold(hAx_1dprof,'off');
         if( get(T3_P1_inv,'Value') == 0 )
-            Show_bestmodels_family( hAx_1dprof );
+            Show_bestmodels_family(0);
         else
             draw_1d_profile(hAx_1dprof, vfst_MDLS{P.isshown.id},'b',1);
             draw_1d_profile(hAx_1dprof,      MDLS{P.isshown.id},'k',1);    
         end
     end
-
 %% TAB-4: =================================================
     function BT_refresh_modelview(~,~,~)
         refresh_models_list2D();
         if(get(hwi23D,'Value') == 1)
-            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(0,property_23d_to_show);
         end
         if(get(hwi23D,'Value') == 2)
-            plot_2d_profile( H.gui,  hAx_2Dprof,property_23d_to_show);
+            plot_2d_profile( 0,property_23d_to_show);
         end
     end
     function BT_show_media(~,~,parameter_id)
@@ -4664,52 +4845,52 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         refresh_models_list2D();
         %
         if(get(hwi23D,'Value') == 1)
-            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(0,property_23d_to_show);
         end
         if(get(hwi23D,'Value') == 2)
-            plot_2d_profile( H.gui,  hAx_2Dprof,property_23d_to_show);
+            plot_2d_profile( 0,property_23d_to_show);
         end
     end
     function Slider0_Callback(hObject, eventdata, handles)%             x-
         slider_value = get(hObject,'Value');
         cutplanes(1) =  slider_value;% x- x+ y- y+ z- z+
         if(get(hwi23D,'Value') == 1)
-            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(0,property_23d_to_show);
         end
     end
     function Slider0b_Callback(hObject, eventdata, handles)%            x+
         slider_value = get(hObject,'Value');
         cutplanes(2) =  slider_value;% x- x+ y- y+ z- z+
         if(get(hwi23D,'Value') == 1)
-            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(0,property_23d_to_show);
         end
     end
     function Slider1_Callback(hObject, eventdata, handles)%             y-
         slider_value = get(hObject,'Value');
         cutplanes(3) =  slider_value;% x- x+ y- y+ z- z+
         if(get(hwi23D,'Value') == 1)
-            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(0,property_23d_to_show);
         end
     end
     function Slider1b_Callback(hObject, eventdata, handles)%            y+
         slider_value = get(hObject,'Value');
         cutplanes(4) =  slider_value;% x- x+ y- y+ z- z+
         if(get(hwi23D,'Value') == 1)
-            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(0,property_23d_to_show);
         end
     end
     function Slider2_Callback(hObject, eventdata, handles)%             z-
         slider_value = get(hObject,'Value');
         cutplanes(5) =  slider_value;% x- x+ y- y+ z- z+
         if(get(hwi23D,'Value') == 1)
-            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(0,property_23d_to_show);
         end
     end
     function Slider2b_Callback(hObject, eventdata, handles)%            z+
         slider_value = get(hObject,'Value');
         cutplanes(6) =  slider_value;% x- x+ y- y+ z- z+
         if(get(hwi23D,'Value') == 1)
-            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(0,property_23d_to_show);
         end
     end
     function ResetSlices_Callback(hObject, eventdata, handles)
@@ -4719,13 +4900,12 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         %isslice = dim;
         cutplanes = [0 1 0 1 0 1];
         if(get(hwi23D,'Value') == 1)
-            plot_3d(H.gui,  hAx_2Dprof,property_23d_to_show);
+            plot_3d(0,property_23d_to_show);
         end
         if(get(hwi23D,'Value') == 2)
-            plot_2d_profile( H.gui,  hAx_2Dprof,property_23d_to_show);
+            plot_2d_profile( 0,property_23d_to_show);
         end
     end
-
 %% TAB-5: =================================================
 %% TAB-5, Panel-1
     function B_conf_backX(~,~,~)
@@ -4808,7 +4988,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                     if( independent_optimiazation_cicles(conf_1d_to_show_x) )
                         fprintf('Same  - model - confidence\n')
                         [vpfit,vsfit,rofit,hhfit,qpfit,qsfit,dafit] = Update_confidence_data();
-                        [S,poten, X1,X2, var1,var2] = confidence_get_limits(vpfit,vsfit,rofit,hhfit,qpfit,qsfit,dafit,  vala,valb, nlaya,nlayb);
+                        [SS,poten, X1,X2, var1,var2] = confidence_get_limits(vpfit,vsfit,rofit,hhfit,qpfit,qsfit,dafit,  vala,valb, nlaya,nlayb);
                     else
                         message = 'Please run the inversion of this curve prior to attempt its confidence calculation.';
                         msgbox(message,'Warning');
@@ -4819,8 +4999,8 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                     if(global_inversion_step)
                         [vpfitx,vsfitx,rofitx,hhfitx,qpfitx,qsfitx,dafitx, ...
                           vpfity,vsfity,rofity,hhfity,qpfity,qsfity,dafity] = Update_confidence_data_x2();
-                        [S,poten, X1,X2, var1,var2] = confidence_get_limits_x2(vpfitx,vsfitx,rofitx,hhfitx,qpfitx,qsfitx,dafitx,vpfity,vsfity,rofity,hhfity,qpfity,qsfity,dafity, vala,valb, nlaya,nlayb);
-                        %confidence_plot(S,poten, X1,X2, var1,var2, vala,valb, nlaya,nlayb);
+                        [SS,poten, X1,X2, var1,var2] = confidence_get_limits_x2(vpfitx,vsfitx,rofitx,hhfitx,qpfitx,qsfitx,dafitx,vpfity,vsfity,rofity,hhfity,qpfity,qsfity,dafity, vala,valb, nlaya,nlayb);
+                        %confidence_plot(SS,poten, X1,X2, var1,var2, vala,valb, nlaya,nlayb);
                     else
                         message = 'Please run Profile inversion prior to attempt cross-measurement confidence.';
                         msgbox(message,'Warning');
@@ -4828,10 +5008,10 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                     end
                 end
                 
-                if(~isempty(S))
+                if(~isempty(SS))
                     %set(hfig,'CurrentAxes',hax);
                     %set(H.gui,'CurrentAxes',hAx_1d_confidence);
-                    confidence_plot(H.gui,hAx_1d_confidence, S,poten, X1,X2, var1,var2, vala,valb, nlaya,nlayb);
+                    confidence_plot(0, SS,poten, X1,X2, var1,var2, vala,valb, nlaya,nlayb);
                 end
             end
         end
@@ -4951,10 +5131,9 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             for ii=1:size(SN_dtamsf,2)
                 SN_dtamsf(:,ii) = SN_dtamsf(:,ii)/max(abs(SN_dtamsf(:,ii)));
             end
-            sensitivity_plot(H.gui,hAx_sensitivity);   
+            sensitivity_plot(0);   
         end
     end
-
 %% *********************** MORE FUNCTIONS *********************************
     %% INITs and Updates
     function INIT_tool_variables()  
@@ -4992,13 +5171,13 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         weight_curv = ones(nxpt,2);
         weight_curv(:,1) = (linspace(xmin,xmax,nxpt)).';
         
-        plot__curve_weights(hAx_cwf);  
+        plot__curve_weights(0);  
         setup_curve_weights();
         %% weights on depth for the curves ================================
         [dzmax] = get_max_depth();
         weight_dpth = ones(n_depth_levels,2);
         weight_dpth(:,1) = linspace(0,dzmax,n_depth_levels);
-        plot__depth_weights();
+        plot__depth_weights(0);
         setup_dpth_weights();
         
         nx_ticks = max(10,size(SURVEYS,1));
@@ -5009,14 +5188,14 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         %%
         %% more
         refresh_models_list2D();
-        
+        fprintf('[Initialization complete]\n')
     end
     function INIT_FDATS()
 		fprintf('...init data space.\n')
         Ndata = size(FDAT,1);
-        last_FDAT  = cell( Ndata, 2);
+        last_FDAT = cell( Ndata, 2);
         best_FDAT = cell( Ndata, 2);
-        
+        prev_best_FDAT = cell( Ndata, 2); 
         %% setup main scale
         main_scale =[];
         x_mins     = zeros(1,Ndata);
@@ -5112,11 +5291,16 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         STORED_2d_qp_fits = cell(1,Nsurveys);
         STORED_2d_qs_fits = cell(1,Nsurveys);
         STORED_2d_daf_fits= cell(1,Nsurveys);
+        %BEST_MISFITS_by_location = cell(1,Nsurveys);
         %% results list
-        BEST_SINGLE_MISFIT = cell(Nsurveys);%{P.isshown.id}(id) = Single_Misfit;
+        BEST_SINGLE_MISFIT = cell(Nsurveys,1);%{P.isshown.id}(id) = Single_Misfit;
         for m = 1:Nsurveys; BEST_SINGLE_MISFIT{m} = realmax()*ones(NresultsToKeep,1); end%{P.isshown.id}(id) = Single_Misfit;
-        BEST_SINGLE_MODELS = cell(NresultsToKeep,Nsurveys);%{id,P.isshown.id}  = last_single_MDLS;
-        Misfit_vs_Iter = cell(Nsurveys + 1);
+        prev_BEST_SINGLE_MISFIT = BEST_SINGLE_MISFIT;
+        %
+        BEST_SINGLE_MODELS = cell(NresultsToKeep,Nsurveys);
+        prev_BEST_SINGLE_MODELS = BEST_SINGLE_MODELS;
+        
+        Misfit_vs_Iter = cell(Nsurveys + 1, 1);
         for m = 1:Nsurveys; Misfit_vs_Iter{m} = []; end
     end
     function INIT_LOCK_TABLE()
@@ -5174,13 +5358,15 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             if (hhdl==hAx_main_geo) || (hhdl==hAx_geo) 
                 set(H.gui,'CurrentAxes',hhdl);
                 hold(hhdl,'off')
+                plot(0,0)
                 cla(hhdl)
             end
         else
-            figure('name','Survey geometry');
-            hhdl  = gca; 
+            hfig= figure('name','Survey geometry'); 
+            hhdl= axes('Parent',hfig,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[0.125 0.125 0.775 0.775]);
+            set(hfig,'CurrentAxes',hhdl);
         end
-        axes(hhdl)
+        
         hold(hhdl,'on')
 %         if(hhdl==hAx_main_geo) || (hhdl==hAx_geo)
 %             set(H.gui,'CurrentAxes',hhdl);
@@ -5260,6 +5446,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         drawnow
     end
     function Update_profile_locations(hhdl)
+        if isempty(P.profile_ids); return; end
         if nargin>0
             if (hhdl==hAx_main_geo)
                 set(H.gui,'CurrentAxes',hhdl);
@@ -5321,6 +5508,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         set(T1_PC_n_of_profiles_txt,  'String', Prf_avail);
         set(T1_PC_active_profiles_txt,'String', Prf_active );
         %
+        grid on
         drawnow
     end
 
@@ -5450,17 +5638,21 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         misfit_over_sumweight = fcdf(misfit_over_sumweight,ndegfree,ndegfree); % sF rescaled !!!  
     end
     
-    function Show_survey(hhdl)
+    function Show_survey(newfigure)
         if (0 < P.isshown.id) && (P.isshown.id <= length(TO_INVERT))
-%             if(hhdl==hAx_dat)
-%                 Update_survey_locations(hAx_geo)
-%Update_survey_locations(hAx_main_geo);
-                set(H.gui,'CurrentAxes',hAx_dat);
-%             end
+
+            if(newfigure)
+                figure_handle = figure('name',strcat('Best model Family: Site',num2str(P.isshown.id)));
+                hhdl = axes('Parent',figure_handle,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[0.125 0.125 0.775 0.775]);
+            else
+                figure_handle = H.gui;
+                hhdl = hAx_dat;
+            end
+            set(figure_handle,'CurrentAxes',hhdl);
             hold(hhdl,'off')
             %% show original data
             cc = 2;% column containing the curve 
-            scale   = FDAT{P.isshown.id,1}();
+            scale= FDAT{P.isshown.id,1}();
             lgnd = '     data';
             show_data = abs( FDAT{P.isshown.id,2} );
             if( curve_plotmode == 0)
@@ -5611,8 +5803,17 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             drawnow
         end
     end
-    function Show_bestmodels_family(hhdl)
-        if(hhdl==hAx_1dprof); set(H.gui,'CurrentAxes',hAx_1dprof); end
+    function Show_bestmodels_family(newfigure)
+        %if(hhdl==hAx_1dprof); set(H.gui,'CurrentAxes',hAx_1dprof); end
+        
+        if(newfigure)
+            figure_handle = figure('name',strcat('Best model Family: Site',num2str(P.isshown.id)));
+            hhdl = axes('Parent',figure_handle,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[0.125 0.125 0.775 0.775]);
+        else
+            figure_handle = H.gui;
+            hhdl = hAx_1dprof;
+        end
+        set(figure_handle,'CurrentAxes',hhdl);
         
         hold(hhdl,'off')
         linecol = [0.7, 0.7, 0.7];
@@ -5631,10 +5832,16 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         linew   = 2;
         draw_1d_profile(hhdl, MDLS{P.isshown.id}, linecol,linew);
     end
-    function plot__curve_weights(hhdl)
-        if(hhdl==hAx_cwf)
-            set(H.gui,'CurrentAxes',hhdl);
+    function plot__curve_weights(newfigure)
+        if(newfigure)
+            figure_handle = figure('name','Curve weights');
+            hhdl = axes('Parent',figure_handle,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[0.125 0.125 0.775 0.775]);
+        else
+            figure_handle = H.gui;
+            hhdl = hAx_cwf;
         end
+        set(figure_handle,'CurrentAxes',hhdl);
+        
         if(curve_weights_plotmode == 0)
             plot(hhdl, weight_curv(:,1), weight_curv(:,2), 'k', 'linewidth',2);
         else
@@ -5648,18 +5855,26 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         grid on
         drawnow;
     end
-    function plot__depth_weights()
-        set(H.gui,'CurrentAxes',hAx_dwf);
-        if(depth_weights_plotmode == 0)
-            plot(hAx_dwf, weight_dpth(:,1), weight_dpth(:,2), 'k', 'linewidth',2);
+    function plot__depth_weights(newfigure)
+        if(newfigure)
+            figure_handle = figure('name','Depth weights');
+            hhdl = axes('Parent',figure_handle,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[0.125 0.125 0.775 0.775]);
         else
-            semilogx(hAx_dwf, weight_dpth(:,1), weight_dpth(:,2), 'k', 'linewidth',2);
+            figure_handle = H.gui;
+            hhdl = hAx_dwf;
+        end
+        set(figure_handle,'CurrentAxes',hhdl);
+        
+        if(depth_weights_plotmode == 0)
+            plot(hhdl, weight_dpth(:,1), weight_dpth(:,2), 'k', 'linewidth',2);
+        else
+            semilogx(hhdl, weight_dpth(:,1), weight_dpth(:,2), 'k', 'linewidth',2);
         end
         
-        xlabel(hAx_dwf,'Depth');
-        ylabel(hAx_dwf,'Weight');
+        xlabel(hhdl,'Depth');
+        ylabel(hhdl,'Weight');
         boundmax = max([1.2,  (max(weight_dpth(:,2))+0.2) ]);
-        ylim(hAx_dwf, [-0.2, boundmax]);
+        ylim(hhdl, [-0.2, boundmax]);
         grid on
         drawnow;
     end
@@ -6223,22 +6438,32 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             end
         end
     end
-    function Store_Results(Energy,Misfit)
+    function Store_Results(Energy,GlobalMisfit,RegularizerValue, Curv_term,Slop_term, misfitvector)
         the_worst_energy = max(BEST_ENERGIES);
         the_best_energy  = min(BEST_ENERGIES);
         if(Energy <= the_worst_energy)% keep this model
-            id = find( BEST_ENERGIES == the_worst_energy);%% id of location to replace 
-            id = id(1);
-            BEST_ENERGIES(id) = Energy;
-            BEST_MISFITS(id)  = Misfit;
-            BEST_MODELS{id}   = last_MDLS;
+            idp = find( BEST_ENERGIES == the_worst_energy);%% id of location to replace 
+            idp = idp(1);
+            BEST_ENERGIES(idp) = Energy;
+            BEST_MISFITS(idp)  = GlobalMisfit;
+            BEST_MODELS{idp}   = last_MDLS;
+            
             %fprintf('     >> kept.\n')
 
             % record the best
             if(Energy < the_best_energy)
-                fprintf('     >> new best model found.\n')
+                %fprintf('     >> new best model found.\n')
                 best_FDAT = last_FDAT;
                 MDLS = last_MDLS;
+                best_MISFIT_by_location = misfitvector;
+                
+                nsofar = size(Misfit_vs_Iter_MULPTIPLE, 1);
+                Misfit_vs_Iter_MULPTIPLE = [Misfit_vs_Iter_MULPTIPLE; [nsofar ,Energy, GlobalMisfit, RegularizerValue, Curv_term,Slop_term] ]; 
+                Misfit_vs_Iter_MULPTIPLE_local = [Misfit_vs_Iter_MULPTIPLE_local; misfitvector];
+                
+                %if(get(h_realtime,  'Value')==0)% update if a new best model is found
+                draw_Misfit_vs_it__MULTIPLE(0);
+                %end
             end
         end
     end
@@ -6395,7 +6620,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         %% curve term
         w2 = weights.^2;
         C2 = (sint_curve-data_curve).^2;
-        curveterm = sum(w2.*C2);        
+        curveterm = (w2')*(C2); %sum(w2.*C2);        
         %% slope term
         DsintDs = sint_curve(2:end)-sint_curve(1:end-1);
         DdataDs = data_curve(2:end)-data_curve(1:end-1);
@@ -6411,31 +6636,30 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         %MFit = slopeterm;
         sumweights = sum(weights);
         er = MFit/sumweights ;%% Er is the misfit divided by the sum of the weights
-    end
-    
+    end    
     function Store_Single_Result(Single_Misfit,MDL,ctrm,strm)
         the_worst_energy = max(BEST_SINGLE_MISFIT{P.isshown.id});
         the_best_energy  = min(BEST_SINGLE_MISFIT{P.isshown.id});
         
         if(Single_Misfit < the_worst_energy)
-            id = find( BEST_SINGLE_MISFIT{P.isshown.id} == the_worst_energy);%% id of location to replace 
-            id = id(1);
+            idp = find( BEST_SINGLE_MISFIT{P.isshown.id} == the_worst_energy);%% id of location to replace 
+            idp = idp(1);
             %fprintf('     >> kept.\n')
-            BEST_SINGLE_MISFIT{P.isshown.id}(id) = Single_Misfit;
-            BEST_SINGLE_MODELS{id,P.isshown.id}  = MDL;
+            BEST_SINGLE_MISFIT{P.isshown.id}(idp) = Single_Misfit;
+            BEST_SINGLE_MODELS{idp,P.isshown.id}  = MDL;
             
             if(Single_Misfit < the_best_energy)
                 %fprintf('     >> new best single-model found.\n')
                 nsofar = size(STORED_RESULTS_1d_misfit{P.isshown.id}, 1);
                 Misfit_vs_Iter{P.isshown.id} = [Misfit_vs_Iter{P.isshown.id}; [nsofar ,Single_Misfit,ctrm, strm] ]; 
                 %%fprintf('it[%d]-->> %f\n',nsofar,Single_Misfit)
-                
+                %
                 nc = length(last_single_FDAT);
                 for j = 1:nc; best_FDAT{P.isshown.id,j} = last_single_FDAT{j}; end
                 MDLS{P.isshown.id} = last_single_MDL;
-                
+                %
                 if(get(h_realtime,  'Value')==0)% update if a new best model is found
-                    Show_survey(hAx_dat);
+                    Show_survey(0);
                     hold(hAx_1dprof,'off');
                     if(~isempty(vfst_MDLS))
                         draw_1d_profile(hAx_1dprof, vfst_MDLS{P.isshown.id},'b',1);
@@ -6444,14 +6668,14 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                     draw_1d_profile(hAx_1dprof, MDLS{P.isshown.id},'k',1);
                     hold(hAx_1dprof,'on');
                     %pause
-                    draw_Misfit_vs_it(H.gui, hAx_MvsIT);
+                    draw_Misfit_vs_it(0);
                 end
-                
+                %
             end
         end
         
         if(get(h_realtime,  'Value')==1)% turn on/off realtime visualization
-            Show_survey(hAx_dat);
+            Show_survey(0);
             
             hold(hAx_1dprof,'off');
             if(~isempty(vfst_MDLS))
@@ -6699,42 +6923,103 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             ylabel('z(m)');
         end
     end
-    function draw_Misfit_vs_it(figure_handle, axes_handle)
-		set(figure_handle,'CurrentAxes',axes_handle);
-        hold(axes_handle,'off')      
+    function draw_Misfit_vs_it(newfigure)
+        if(newfigure)
+            hgui = figure('name',strcat('Optimization evolution: Site',num2str(P.isshown.id)));
+            h_ax = axes('Parent',hgui,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[0.125 0.125 0.775 0.775]);
+        else
+            hgui = H.gui;
+            h_ax = hAx_MvsIT;
+        end
+		
+        
+        set(hgui,'CurrentAxes',h_ax);
+        hold(h_ax,'off')      
         if(~isempty(Misfit_vs_Iter))
             if(~isempty(Misfit_vs_Iter{P.isshown.id}))
-                %hold(axes_handle,'on')
-%                 vmax = 0.01*max(Misfit_vs_Iter{P.isshown.id}(:,2));
-%                 graph = Misfit_vs_Iter{P.isshown.id}(:,2)./vmax;
-%                 cgraph= Misfit_vs_Iter{P.isshown.id}(:,3)./vmax;
-%                 sgraph= Misfit_vs_Iter{P.isshown.id}(:,4)./vmax;
                 %
-                cgraph= Misfit_vs_Iter{P.isshown.id}(:,3)/max(Misfit_vs_Iter{P.isshown.id}(:,3));
-                sgraph= Misfit_vs_Iter{P.isshown.id}(:,4)/max(Misfit_vs_Iter{P.isshown.id}(:,4));
-                graph  = Misfit_vs_Iter{P.isshown.id}(:,2)/max(Misfit_vs_Iter{P.isshown.id}(:,2));
+                cgraph= Misfit_vs_Iter{P.isshown.id}(:,3)./max(Misfit_vs_Iter{P.isshown.id}(:,3));
+                sgraph= Misfit_vs_Iter{P.isshown.id}(:,4)./max(Misfit_vs_Iter{P.isshown.id}(:,4));
+                graph = Misfit_vs_Iter{P.isshown.id}(:,2)./max(Misfit_vs_Iter{P.isshown.id}(:,2));
                 
                 %cgraph= Misfit_curve_term_w * Misfit_vs_Iter{P.isshown.id}(:,3)/max(Misfit_vs_Iter{P.isshown.id}(:,3));
                 %sgraph= Misfit_slope_term_w * Misfit_vs_Iter{P.isshown.id}(:,4)/max(Misfit_vs_Iter{P.isshown.id}(:,4));
                 %
                 xscal = Misfit_vs_Iter{P.isshown.id}(:,1);
-                plot(axes_handle, xscal, graph,'.-k','LineWidth',3,'MarkerSize',5);
-                hold(axes_handle,'on')
-                plot(axes_handle,  xscal, cgraph,'-r','LineWidth',3,'MarkerSize',1);
-                plot(axes_handle,  xscal, sgraph,'-g','LineWidth',3,'MarkerSize',1);
+                plot(h_ax, xscal, graph,'.-k','LineWidth',3,'MarkerSize',5);
+                hold(h_ax,'on')
+                plot(h_ax,  xscal, cgraph,'-r','LineWidth',3,'MarkerSize',1);
+                plot(h_ax,  xscal, sgraph,'-g','LineWidth',3,'MarkerSize',1);
                 
                 grid on
-                xlabel(axes_handle,'it, [k]Misfit [r]Curve [g]slope');
-                ylabel(axes_handle,'100 M/M_0');
+                xlabel(h_ax,'it, [k]Misfit [r]Curve [g]slope');
+                ylabel(h_ax,'100 M/M_0');
                 
                 ylim([0 1]);
-                %hold(axes_handle,'off')
             end
         end
     end
-    %%
-    function plot_2d_profile(figure_handle, axes_handle, quantity)
-        
+    function draw_Misfit_vs_it__MULTIPLE(newfigure)
+        if(newfigure)
+            hgui = figure('name','Optimization evolution (Laterally constrained)');
+            h_ax(1) = axes('Parent',hgui,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[0.1 0.1   0.35 0.8]);
+            h_ax(2) = axes('Parent',hgui,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[0.6 0.1   0.35 0.8]);
+        else
+            hgui = H.gui;
+            h_ax(1) = hAx_MvsIT_full;
+            h_ax(2) = hAx_MvsIT_full_local;
+        end
+		     
+        if(~isempty(Misfit_vs_Iter_MULPTIPLE))
+            %
+            %% GLOBAL PLOT
+            set(hgui,'CurrentAxes',h_ax(1));
+            hold(h_ax(1),'off') 
+            %
+            % Misfit_vs_Iter_MULPTIPLE = [Misfit_vs_Iter_MULPTIPLE; [nsofar ,Energy, GlobalMisfit, RegularizerValue, Curv_term,Slop_term] ]; 
+            cgraph= Misfit_vs_Iter_MULPTIPLE(:,5)./max(Misfit_vs_Iter_MULPTIPLE(:,5));
+            sgraph= Misfit_vs_Iter_MULPTIPLE(:,6)./max(Misfit_vs_Iter_MULPTIPLE(:,6));
+            graph = Misfit_vs_Iter_MULPTIPLE(:,2)./max(Misfit_vs_Iter_MULPTIPLE(:,2));
+            REGgraph = Misfit_vs_Iter_MULPTIPLE(:,4)./max(Misfit_vs_Iter_MULPTIPLE(:,4));
+            %cgraph= Misfit_curve_term_w * Misfit_vs_Iter{P.isshown.id}(:,3)/max(Misfit_vs_Iter{P.isshown.id}(:,3));
+            %sgraph= Misfit_slope_term_w * Misfit_vs_Iter{P.isshown.id}(:,4)/max(Misfit_vs_Iter{P.isshown.id}(:,4));
+            %
+            xscal = Misfit_vs_Iter_MULPTIPLE(:,1);
+            plot(h_ax(1),  xscal, REGgraph,'-y','LineWidth',3,'MarkerSize',1);
+            hold(h_ax(1),'on')
+            plot(h_ax(1),  xscal, cgraph,'-r','LineWidth',3,'MarkerSize',1);
+            plot(h_ax(1),  xscal, sgraph,'-g','LineWidth',3,'MarkerSize',1);
+            plot(h_ax(1),  xscal, graph,'.-k','LineWidth',3,'MarkerSize',5);
+            grid on
+            xlabel(h_ax(1),'it, [k]Misfit [r]Curve [g]slope [y]Regularizer');
+            ylabel(h_ax(1),'100 M/M_0');
+
+            ylim([0 1]);
+            title('Global evolution')
+            
+            %
+            %% Local PLOT
+            set(hgui,'CurrentAxes',h_ax(2));
+            hold(h_ax(2),'off') 
+            normalized_local_misfits = Misfit_vs_Iter_MULPTIPLE_local(end,:)./ max(Misfit_vs_Iter_MULPTIPLE_local); 
+            
+            plot(h_ax(2),  normalized_local_misfits, '.-k','LineWidth',3,'MarkerSize',5);
+            grid on
+            xlabel(h_ax(2),'Location ID');
+            ylabel(h_ax(2),'100 M(i)/M_0(i)');
+            ylim([0 1]);
+            title('Local evolution')
+        end
+    end
+    
+    function plot_2d_profile(newfigure, quantity)
+        if(newfigure)
+            figure_handle = figure('name','Model visualization');
+            axes_handle = axes('Parent',figure_handle,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[0.125 0.125 0.775 0.775]);
+        else
+            figure_handle = H.gui;
+            axes_handle = hAx_2Dprof;
+        end
         if(isempty(P.profile_ids))
             Message = ['Profiles not yet defined.'];
             msgbox(Message,'CREDITS:')
@@ -6787,7 +7072,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         %% bedrock mask
         if get(T5_P1_HsMask,'Value')
             polygonx = [rr(1); rr; rr(end)];
-            polygony = [bottom_Z; bedrockline; bottom_Z];
+            polygony = [bottom_Z; bedrockline; bottom_Z]-0.2*min( abs(bottom_Z - bedrockline) );
             fill(polygonx ,polygony, [0 0 0])
         end
         %% layers boundaries
@@ -6814,7 +7099,15 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         end   
         title(str);
 	end
-    function plot_3d(figure_handle, axes_handle, quantity)
+    function plot_3d(newfigure, quantity)
+        if(newfigure)
+            figure_handle = figure('name','Viewer 3D');
+            axes_handle = axes('Parent',figure_handle,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[0.125 0.125 0.775 0.775]);
+        else
+            figure_handle = H.gui;
+            axes_handle = hAx_2Dprof;
+        end
+        
 		if(property_23d_to_show == 0); return; end
         
         set(figure_handle,'CurrentAxes',axes_handle);
@@ -7055,28 +7348,40 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
     end
     
     function plot_extern(~,~,idx)
-        hxten = figure;
-        hAxs= axes('Parent',hxten,'Units', 'normalized','Units','normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position', [0.1 0.1 0.85 0.85]);
+%         hxten = figure;
+%         hAxs= axes('Parent',hxten,'Units', 'normalized','Units','normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position', [0.1 0.1 0.85 0.85]);
         switch(idx) 
             case 1% Curve-Weighting Function
-                plot__curve_weights(hAxs);
+                plot__curve_weights(1);
+            case 2% Curve-Weighting Function
+                plot__depth_weights(1);    
             case 3% survey locations
-                Update_survey_locations(hAxs);
+                Update_survey_locations();% no input = plot extern
+            case 31% profile locations
+                Update_profile_locations();% no input = plot extern    
             case 4% view data
-                Show_survey(hAxs)
+                Show_survey(1)
             case 5% view model 1d
-                Show_bestmodels_family(hAxs);
+                Show_bestmodels_family(1);
             case 6% view model 2d
-                if(property_23d_to_show>0); 
+                if(property_23d_to_show>0)
                     %plot_2d_profile(hxten, hAxs, property_23d_to_show); 
-                    plot_3d(hxten, hAxs, property_23d_to_show);
+                    % plot_3d(1, property_23d_to_show);
+                    if(get(hwi23D,'Value') == 1)
+                        plot_3d(1,property_23d_to_show);
+                    end
+                    if(get(hwi23D,'Value') == 2)
+                        plot_2d_profile( 1,property_23d_to_show);
+                    end
                 end
             case 7% view confidence
-                confidence_plot(hxten,hAxs,  S,poten, X1,X2, var1,var2, vala,valb, nlaya,nlayb)
-            case 8% view confidence
-                sensitivity_plot(hxten,hAxs)
+                confidence_plot(1,  SS,poten, X1,X2, var1,var2, vala,valb, nlaya,nlayb)
+            case 8% view sensitivity
+                sensitivity_plot(1)
             case 9% view Misfit VS Iteration
-                draw_Misfit_vs_it(hxten,hAxs);
+                draw_Misfit_vs_it(1);
+            case 10% view Misfit VS Iteration (for Multiple simultaneous evolution)
+                draw_Misfit_vs_it__MULTIPLE(1);    
         end
     end
     function funct_saveimage(~,~,~)
@@ -7093,7 +7398,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         end
     end
     %% Confidence
-    function [S,poten, X1,X2, var1,var2] = confidence_get_limits(vp,vs,ro,hh,qp,qs,daf, vala,valb, nlaya,nlayb)
+    function [SS,poten, X1,X2, var1,var2] = confidence_get_limits(vp,vs,ro,hh,qp,qs,daf, vala,valb, nlaya,nlayb)
         % 
         fprintf('>>>> confidence_get_limits()\n')
         
@@ -7134,19 +7439,19 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
 
         fctr=4.;
         n1=length(X1); n2=length(X2);
-%%S        s=vs(:,end);%%S               each row: [vs-lay1, vs-lay2, ... vs-hspace, er]
-%%S                           er is (weighted misfit)/(somma cumulativa pesi)
+%%SS        s=vs(:,end);%%SS               each row: [vs-lay1, vs-lay2, ... vs-hspace, er]
+%%SS                           er is (weighted misfit)/(somma cumulativa pesi)
         s = misfit_over_sumweight;
         smax=max(s);
-        S = zeros(n2,n1);
+        SS = zeros(n2,n1);
         for i=1:n1
             for j=1:n2
                 g=min(s(var1>X1(i)-step1*fctr & var1<X1(i)+step1*fctr & var2>X2(j)-step2*fctr & var2<X2(j)+step2*fctr));
                 sizeg=size(g);
                 if sizeg(1)*sizeg(2)>0
-                    S(j,i)=g;
+                    SS(j,i)=g;
                 else
-                    S(j,i)=smax;
+                    SS(j,i)=smax;
                 end
             end
         end
@@ -7154,7 +7459,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         poten=1;
         %Plot_misfit;% ---->>> function confidence_plot()
     end
-    function [S,poten, X1,X2, var1,var2] = confidence_get_limits_x2(vpx,vsx,rox,hhx,qpx,qsx,dafx,  vpy,vsy,roy,hhy,qpy,qsy,dafy, vala,valb, nlaya,nlayb)
+    function [SS,poten, X1,X2, var1,var2] = confidence_get_limits_x2(vpx,vsx,rox,hhx,qpx,qsx,dafx,  vpy,vsy,roy,hhy,qpy,qsy,dafy, vala,valb, nlaya,nlayb)
         % 
         
         fprintf('>>>> confidence_get_limits ()\n')
@@ -7196,19 +7501,19 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
 
         fctr=4.;
         n1=length(X1); n2=length(X2);
-%%S        s=vs(:,end);%%S               each row: [vs-lay1, vs-lay2, ... vs-hspace, er]
-%%S                           er is (weighted misfit)/(somma cumulativa pesi)
+%%SS        s=vs(:,end);%%SS               each row: [vs-lay1, vs-lay2, ... vs-hspace, er]
+%%SS                           er is (weighted misfit)/(somma cumulativa pesi)
         s = misfit_over_sumweight;
         smax=max(s);
-        S = zeros(n2,n1);
+        SS = zeros(n2,n1);
         for ii=1:n1
             for jj=1:n2
                 g=min(s(var1>X1(ii)-step1*fctr & var1<X1(ii)+step1*fctr & var2>X2(jj)-step2*fctr & var2<X2(jj)+step2*fctr));
                 sizeg=size(g);
                 if sizeg(1)*sizeg(2)>0
-                    S(jj,ii)=g;
+                    SS(jj,ii)=g;
                 else
-                    S(jj,ii)=smax;
+                    SS(jj,ii)=smax;
                 end
             end
         end
@@ -7218,9 +7523,17 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
     end
 
     
-    function confidence_plot(hfig,hax, S,poten, X1,X2, var1,var2, vala,valb, nlaya,nlayb)
-        fprintf('>>>> confidence_plot()\n')
-        SMa = nanmoving_average2(S.^poten,lsmooth,lsmooth);
+    function confidence_plot(newfigure, SS,poten, X1,X2, var1,var2, vala,valb, nlaya,nlayb)
+        if isempty(SS); return; end
+        if(newfigure)
+            hfig = figure('name','Confidence');
+            hax = axes('Parent',hfig,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[0.125 0.125 0.775 0.775]);
+        else
+            hfig = H.gui;
+            hax = hAx_1d_confidence;
+        end
+        %fprintf('>>>> confidence_plot()\n')
+        SMa = nanmoving_average2(SS.^poten,lsmooth,lsmooth);
         
         SMa(SMa==0)=NaN;
         SMmin=min(min(SMa));
@@ -7282,9 +7595,15 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         vala =get( hsns_xprop ,'value');%  parameter name 1
         nlaya=get( hsns_xlay ,'value');% id of layer under study
     end
-    function sensitivity_plot(figure_handle,axes_handle)
-        if(~isempty(SN_dtamsf))
-            
+    function sensitivity_plot(newfigure)
+        if(isempty(SN_dtamsf)); return; end
+            if(newfigure)
+                figure_handle = figure('name','Sensitivity');
+                axes_handle = axes('Parent',figure_handle,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[0.125 0.125 0.775 0.775]);
+            else
+                figure_handle = H.gui;
+                axes_handle = hAx_sensitivity;
+            end    
             nlv = str2double(get(hsns_nlevels,'String'));
             
             set(figure_handle,'CurrentAxes',axes_handle);%figure_handle
@@ -7312,7 +7631,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             ylabel(SN_parname)
 
             set(axes_handle,'XScale','log')
-        end
+        
     end
 
 % _________________________________________________________________________
@@ -7341,8 +7660,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         panel_points = G.main_h*vecposition(4);% panel height in points
         panel_over_main_ratio =  panel_points/G.main_h;%                  ratio referred to full interface
         height = gui_height/panel_over_main_ratio;%                   unitary height of objects in this pane
-    end
-    
+    end    
 end% end gui
 
 
