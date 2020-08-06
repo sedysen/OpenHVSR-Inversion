@@ -1,3 +1,5 @@
+% Lateral constrained montecarlo inversion of HVSR data
+%
 %%%-----------------------------
 %%
 %% Lateral constrained montecarlo inversion of HVSR data
@@ -29,6 +31,7 @@
 %%                                              NEW main tab showing the survey map
 %%                                              NEW multiple profiles definition
 %%                                              NEW terrain elevation in profiles
+%%       August 10, 2020          2D profile revision
 %%       Note: all imput text files are assuming to use UTF-8 encoding
 %%
 %%
@@ -43,7 +46,7 @@ clc
 enable_menu = 0;
 %%  -----------------------------------------------------------------------
 mode = '2D';%%   only 2D (better for 2-D profiles)
-%mode = '3D';%%  
+mode = '3D';%%  
 %%  -----------------------------------------------------------------------
 %% some settings
 fontsizeis = 15;
@@ -68,7 +71,7 @@ if strcmp(mode,'2D')
     gui_2D_190410(enable_menu,fontsizeis);% routine for 2D geometry
 end
 if strcmp(mode,'3D')
-    gui_3D_190410();% routine for 3D geometry
+    gui_3D_200805();% routine for 3D geometry
 end
 
 

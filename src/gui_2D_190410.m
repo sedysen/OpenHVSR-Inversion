@@ -26,6 +26,8 @@ function gui_2D(enable_menu,fontsizeis)
 close all
 clc
 
+last_elaboration_name = '';
+
 %% to load project
 id ='';
 i = 0;
@@ -1283,7 +1285,9 @@ last_log_number= 0;
 history
 %
 %
-publish_gui(h_gui,h10,appname,version);
+Pfunction__publish_gui(h_gui,h10,appname,version);
+%publish_gui(h_gui,h10,appname,version);
+
 set(h_gui, 'MenuBar', 'none');
 set(h_gui, 'ToolBar', 'none');
 %

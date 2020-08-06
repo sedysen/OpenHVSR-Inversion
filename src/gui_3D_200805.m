@@ -20,7 +20,7 @@
 %
 %
 % Lateral constrained montecarlo inversion of HVSR data
-function gui_3D_190410()  
+function gui_3D_200805()  
 
 close all
 clc
@@ -4094,7 +4094,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         if (0<id_farhest) && (id_farhest<=Np)
             % filter measurement points
             found_ids = 0;
-            if(xx(1)==xx(2)) % rect x=constant
+            if(abs(xx(1)-xx(2))<0.000000001) % rect x=constant
                 recta_kind = 1;
                 r_distance_from_profile = abs(receiver_locations(id_farhest,1)-xx(1));
                 for ii = 1:Np
@@ -4106,7 +4106,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                     end
                 end
             end
-            if(yy(1)==yy(2)) % rect y=constant
+            if( abs(yy(1)-yy(2))<0.000000001) % rect y=constant
                 r_distance_from_profile = abs(receiver_locations(id_farhest,2)-yy(1));
                 for ii = 1:Np
                     recta_kind = 2;
@@ -4179,9 +4179,9 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                 dummy_ids = dummy_ids(1:found_ids,:);
                 if found_ids>1% at least two station per profile
                     if ~isempty(P.profile_ids)
-                        pid = size(P.profile_ids,1) +1;
+                        prid = size(P.profile_ids,1) +1;
                     else
-                        pid=1;
+                        prid=1;
                         P.profile.id=1;
                     end
                     %
@@ -4190,7 +4190,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                     %
                     % check for double entries (same longitudinal distance, to be avoided)
                     original_sortedmat = sortedmat;
-                    distance_checked = 0;
+                    distance_checked = min(sortedmat(:,2))-1;
                     current_line=0; 
                     for pp=1:found_ids
                         [r,~]= find(original_sortedmat(:,2)==original_sortedmat(pp,2));
@@ -4201,6 +4201,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                         end
                     end
                     sortedmat = sortedmat(1:current_line,:);
+                    if(isempty(sortedmat)); return; end 
                     if size(sortedmat,1)~=size(original_sortedmat,1)
                         Message = sprintf('MESSAGE: Some stations were not included in the profile\nbecause they would occupy the same location.');
                         %waitfor(warndlg(Message,'INFO'));
@@ -4210,10 +4211,10 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                     dummy_onoff(sortedmat(:,1)) = 1; 
                     %
                     %
-                    P.profile_ids{pid,1}   = sortedmat;
-                    P.profile_line{pid,1}  = dummy_line;
-                    P.profile_onoff{pid,1} = dummy_onoff;
-                    P.profile_name{pid,1} = profile_name;
+                    P.profile_ids{prid,1}   = sortedmat;
+                    P.profile_line{prid,1}  = dummy_line;
+                    P.profile_onoff{prid,1} = dummy_onoff;
+                    P.profile_name{prid,1} = profile_name;
                     %profile_ids   = sortedmat;
                     %profile_line  = dummy_line;
                     %
@@ -4272,7 +4273,8 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                 P.profile_name{nowid,1}  = temp_name{ipid,1}; 
             end
         end
-        %  
+        % 
+        P.profile.id =1;
         Update_survey_locations(hAx_main_geo);
         Update_survey_locations(hAx_geo)
     end   

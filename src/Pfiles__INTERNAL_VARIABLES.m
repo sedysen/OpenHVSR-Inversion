@@ -1,7 +1,7 @@
 
 %% INFO
 P.appname_3D = 'OpenHVSR-3D Inversion  (BETA)';%% Note: the "3D" in P.appname is used to recognize dimensionality
-P.appversion_3D = 'v4.0.0';
+P.appversion_3D = 'v4.0.1';
 
 %% Data shown
 P.isshown.id                    = 0;%  Id of dataset shown in inversion
