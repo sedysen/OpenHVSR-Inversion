@@ -32,8 +32,17 @@
 %%                                              NEW multiple profiles definition
 %%                                              NEW terrain elevation in profiles
 %%       August 10, 2020          2D profile revision
-%%       Note: all imput text files are assuming to use UTF-8 encoding
+%%       September 10, 2020    Improved the View Menu. 
+%%                                              Solved a minor issue with color_axis variable. 
+%%                                              Improved image production
+%%                                              Changed behavior of "Refresh" button
+%%       January 27,2021           fixed backword compatibility R2016b: (gimput) 
 %%
+%%
+%%
+%%       Notes: 
+%%             1) all imput text files are assuming to use UTF-8 encoding
+%%             2) Use the command "codeCompatibilityReport" to solve Matlab version compatibility issues
 %%
 
 %%%-----------------------------
@@ -68,10 +77,10 @@ if ~strcmp(current_folder , ffullpath)
 end
 %%
 if strcmp(mode,'2D')
-    gui_2D_190410(enable_menu,fontsizeis);% routine for 2D geometry
+    gui_2D_210127(enable_menu,fontsizeis);% routine for 2D geometry
 end
 if strcmp(mode,'3D')
-    gui_3D_200805();% routine for 3D geometry
+    gui_3D_210127();% routine for 3D geometry
 end
 
 

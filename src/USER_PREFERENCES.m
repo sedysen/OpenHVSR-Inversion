@@ -38,6 +38,10 @@ fprintf('      customized by editing this file.\n')
 USER_PREFERENCE_Move_over_suggestions            = 'on';% [on/off] Toggle interactive suggestions
 USER_PREFERENCE_interface_objects_fontsize       = 12;% size in points 
 USER_PREFERENCE_enable_Matlab_default_menu       = 0;% [0=off/ 1=on]
+USER_PREFERENCE_Subsurface_model_color_limits    = [];
+USER_PREFERENCE_Subsurface_model_colormap        = 'Jet';
+USER_PREFERENCE_Subsurface_model_interpolation   = [];
+
 % 
 %
 %                    

@@ -20,7 +20,7 @@
 %
 %
 % Lateral constrained montecarlo inversion of HVSR data
-function gui_3D_200805()  
+function gui_3D_210127()  
 
 close all
 clc
@@ -216,6 +216,10 @@ viewerview = [ -37.5, 30.0];
 USER_PREFERENCE_Move_over_suggestions      = '';
 USER_PREFERENCE_interface_objects_fontsize = 0; 
 USER_PREFERENCE_enable_Matlab_default_menu = 0;
+%
+USER_PREFERENCE_Subsurface_model_color_limits = [];
+USER_PREFERENCE_Subsurface_model_colormap     = 'Jet';
+USER_PREFERENCE_Subsurface_model_interpolation= [];
 USER_PREFERENCES
 %
 %%    Target Earthquake
@@ -239,9 +243,12 @@ SN_dtamsf              = [];
 SN_parname             = '';
 SN_centralval          = 0;
 %%    Figure variables
-nx_ticks = 0;
+nx_ticks = 0;% interpolation
 ny_ticks = 0;
 nz_ticks = 0;
+color_limits = [];
+color_map  = ''; 
+
 %%        Show weights
 curve_weights_plotmode = 1;
 depth_weights_plotmode = 0;
@@ -313,27 +320,32 @@ h1  = uimenu(H.gui,'Label','Settings');
 uimenu(h1,'Label','Setup','Callback',{@Menu_Settings_Setup});
 uimenu(h1,'Label','Objective Func.','Callback',{@Menu_Settings_objective});
 %%    View
+%%        HVSR curve
 h5  = uimenu(H.gui,'Label','View');
 h51 = uimenu(h5,'Label','HVSR');
 uimenu(h51,'Label','View Freq. range','Callback',{@Menu_view_xcurverange_custom});
 uimenu(h51,'Label','Fit view to processed data','Callback',{@Menu_view_xcurverange_fitprocessed});
 uimenu(h51,'Label','Fit view all data','Callback',{@Menu_view_xcurverange_fitdata});
-
-h52 = uimenu(h5,'Label','Profile');
+%%        SUBSURFACE view
+h52 = uimenu(h5,'Label','Subsurface');
+%%            Interpolation
 uimenu(h52,'Label','Interpolation','Callback',{@Menu_view_media_interp});
-%%        Smooting
-eh52 = uimenu(h52,'Label','Smoothing');
-eh52_childs = zeros(1,4);
-eh52_childs(1) = uimenu(eh52,'Label','off','Callback',        {@Menu_smoothing_strategy0_Callback});
-eh52_childs(2) = uimenu(eh52,'Label','Layer','Callback',      {@Menu_smoothing_strategy1_Callback});
-eh52_childs(3) = uimenu(eh52,'Label','Broad Layer','Callback',{@Menu_smoothing_strategy2_Callback});
-eh52_childs(4) = uimenu(eh52,'Label','Bubble','Callback',     {@Menu_smoothing_strategy3_Callback});
 %%        colormap
 uimenu(h52,'Label','Color Limits','Callback',{@Menu_View_clim});
 h5_1 = uimenu(h5,'Label','Colormap');
 uimenu(h5_1,'Label','Jet','Callback', {@Menu_view_cmap_Jet});
 uimenu(h5_1,'Label','Hot','Callback', {@Menu_view_cmap_Hot});
 uimenu(h5_1,'Label','Bone','Callback',{@Menu_view_cmap_Bone});
+%%
+eh52 = uimenu(h52,'Label','Profile Smoothing');
+eh52_childs = zeros(1,4);
+eh52_childs(1) = uimenu(eh52,'Label','off','Callback',        {@Menu_smoothing_strategy0_Callback});
+eh52_childs(2) = uimenu(eh52,'Label','Layer','Callback',      {@Menu_smoothing_strategy1_Callback});
+eh52_childs(3) = uimenu(eh52,'Label','Broad Layer','Callback',{@Menu_smoothing_strategy2_Callback});
+eh52_childs(4) = uimenu(eh52,'Label','Bubble','Callback',     {@Menu_smoothing_strategy3_Callback});
+
+
+
 %%    Extra
 h7  = uimenu(H.gui,'Label','Extra');
 uimenu(h7,'Label','Schreenshot','Callback',{@funct_saveimage});
@@ -1212,7 +1224,7 @@ hwi23D = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style'
     'Units','normalized','Position',[objx, objy(row), objw, 3*objh]);
 %
 row = row+2;
-uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
+hRefresh = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Refresh', ...
     'Units','normalized','Position',[objx, objy(row), objw, objh], ...
     'Callback',{@BT_refresh_modelview});
@@ -3000,14 +3012,31 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         prompt = {'N of x ticks','N of y  ticks','N of z  ticks'};
         def = {num2str(nx_ticks), num2str(ny_ticks), num2str(nz_ticks)};
         answer = inputdlg(prompt,'Set resolution of 2D/3D representation',1,def);
-        
+        nx_ticks_old = nx_ticks; ny_ticks_old = ny_ticks; nz_ticks_old = nz_ticks;
+       
         nx_ticks = str2double(answer{1}); 
         ny_ticks = str2double(answer{2}); 
         nz_ticks = str2double(answer{3});
+        if(nx_ticks<1 || ny_ticks<1 || nz_ticks<1); return; end
         
-        if(nx_ticks < size(SURVEYS,1)); nx_ticks = size(SURVEYS,1); end
-        if(ny_ticks < size(SURVEYS,1)); ny_ticks = size(SURVEYS,1); end
-        if(nz_ticks < n_depth_levels);  nz_ticks = n_depth_levels; end
+        if(nx_ticks < size(SURVEYS,1)) 
+            msgbox(sprintf('Message: the vertical number of interpolating points cannot be less than %d',size(SURVEYS,1)))
+            nx_ticks = size(SURVEYS,1); 
+        end
+        if(ny_ticks < size(SURVEYS,1)) 
+            msgbox(sprintf('Message: the vertical number of interpolating points cannot be less than %d',size(SURVEYS,1)))
+            ny_ticks = size(SURVEYS,1); 
+        end
+        if(nz_ticks < n_depth_levels)
+            %fprintf('Message: the vertical number of interpolating points cannot be less than %d\n',n_depth_levels)
+            %fprintf('\n')
+            msgbox(sprintf('Message: the vertical number of interpolating points cannot be less than %d',n_depth_levels))
+            nz_ticks = n_depth_levels; 
+        end
+        
+        if( (nx_ticks_old ~= nx_ticks) || (ny_ticks_old ~= ny_ticks) || (nz_ticks_old ~= nz_ticks) )
+            set(hRefresh,'BackgroundColor',[1,0,0]);
+        end
     end
 %%          smoothing
     function Menu_smoothing_strategy0_Callback(~,~,~)
@@ -3042,18 +3071,22 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
 %%          colormap
     function Menu_view_cmap_Jet(~,~,~)
         set(H.gui,'CurrentAxes',hAx_2Dprof);
-        colormap(hAx_2Dprof, 'Jet');
+        color_map='Jet';
+        colormap(hAx_2Dprof, color_map);
     end
     function Menu_view_cmap_Hot(~,~,~)
         set(H.gui,'CurrentAxes',hAx_2Dprof);
-        colormap(hAx_2Dprof, 'Hot');
+        color_map='Hot';
+        colormap(hAx_2Dprof, color_map);
     end
     function Menu_view_cmap_Bone(~,~,~)
         set(H.gui,'CurrentAxes',hAx_2Dprof);
-        colormap(hAx_2Dprof, 'Bone');
+        color_map='Bone';
+        colormap(hAx_2Dprof, color_map);
     end
     function Menu_View_clim(~,~,~)
         prompt = {'Choose Color Limits',''};
+        if(isempty(color_limits)); return; end
         def = {num2str(color_limits(1)), num2str(color_limits(2))};
         answer = inputdlg(prompt,'Set color limits',1,def);
         if(~isempty(answer))
@@ -3892,13 +3925,14 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             [boxx,boxy] = getsquare(weight_curv(1,1),weight_curv(L,1));
             drawsquare(hAx_cwf,boxx,boxy);
             
-            %[~,value] = ginput(1);% take points
-            %if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
-            if Matlab_Release_num>2017.1% Solve ginput issuewith R2017b and above
-                [~,value] = sam2018b_ginput(1);
-            else
-                [~,value] = ginput(1);
-            end
+%             %[~,value] = ginput(1);% take points
+%             %if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
+%             if Matlab_Release_num>2017.1% Solve ginput issuewith R2017b and above
+%                 [~,value] = sam2018b_ginput(1);
+%             else
+%                 [~,value] = ginput(1);
+%             end
+            [~,value] = BackwordCompatible_ginput(Matlab_Release_num, 1, hAx_cwf);% <-(MRelease, N, haxis); 200127
             if(value<0); value = 0; end
             
             %% update
@@ -3990,13 +4024,14 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             [boxx,boxy] = getsquare(weight_dpth(1,1),weight_dpth(L,1));
             drawsquare(hAx_dwf,boxx,boxy);
             
-            %[~,value] = ginput(1);% take points
-            %if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
-            if Matlab_Release_num>2017.1% Solve ginput issuewith R2017b and above
-                [~,value] = sam2018b_ginput(1);
-            else
-                [~,value] = ginput(1);
-            end
+%             %[~,value] = ginput(1);% take points
+%             %if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
+%             if Matlab_Release_num>2017.1% Solve ginput issuewith R2017b and above
+%                 [~,value] = sam2018b_ginput(1);
+%             else
+%                 [~,value] = ginput(1);
+%             end
+            [~,value] = BackwordCompatible_ginput(Matlab_Release_num, 1, hAx_dwf);% <-(MRelease, N, haxis); 200127
             if(value<0); value = 0; end
             
             %% update
@@ -4064,17 +4099,18 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         if isempty(SURVEYS); return; end
         Np = size(receiver_locations,1);
         recta_kind = 0;
-        if Matlab_Release_num>2017.1% Solve ginput issuewith R2017b and above
-            [xx,yy] = sam2018b_ginput(2, hAx_main_geo);%hAx_main_geo);
-        else
-            if Matlab_Release_num==2016.1
-                axes(hAx_main_geo)
-                [xx,yy] = ginput(2);
-            else
-                [xx,yy] = ginput(2, hAx_main_geo);
-            end
-        end
-        
+%         if Matlab_Release_num>2017.1% Solve ginput issuewith R2017b and above
+%             [xx,yy] = sam2018b_ginput(2, hAx_main_geo);%hAx_main_geo);
+%         else
+%             if Matlab_Release_num==2016.1
+%                 axes(hAx_main_geo)
+%                 [xx,yy] = ginput(2);
+%             else
+%                 [xx,yy] = ginput(2, hAx_main_geo);
+%             end
+%         end
+        [xx,yy] = BackwordCompatible_ginput(Matlab_Release_num, 2, hAx_main_geo);% <-(MRelease, N, haxis); 200127
+            
         if( (xx(1)==xx(2)) && (yy(1)==yy(2))); return; end
         dummy_ids = zeros(Np,3);
         dummy_line    = [xx,yy];
@@ -4833,6 +4869,10 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
     end
 %% TAB-4: =================================================
     function BT_refresh_modelview(~,~,~)
+        bgc = [1 0.5 0.1];
+        set(hRefresh,'BackgroundColor',bgc,'enable','off','String','Wait...')
+        drawnow
+        %
         refresh_models_list2D();
         if(get(hwi23D,'Value') == 1)
             plot_3d(0,property_23d_to_show);
@@ -4840,6 +4880,8 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         if(get(hwi23D,'Value') == 2)
             plot_2d_profile( 0,property_23d_to_show);
         end
+        bgc = 0.9*[1 1 1];
+        set(hRefresh,'BackgroundColor',bgc,'enable','on','String','Refresh')
     end
     function BT_show_media(~,~,parameter_id)
         property_23d_to_show = parameter_id;
@@ -4852,6 +4894,8 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         if(get(hwi23D,'Value') == 2)
             plot_2d_profile( 0,property_23d_to_show);
         end
+        bgc = 0.9*[1 1 1];
+        set(hRefresh,'BackgroundColor',bgc,'enable','on','String','Refresh')
     end
     function Slider0_Callback(hObject, eventdata, handles)%             x-
         slider_value = get(hObject,'Value');
@@ -5181,10 +5225,25 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         weight_dpth(:,1) = linspace(0,dzmax,n_depth_levels);
         plot__depth_weights(0);
         setup_dpth_weights();
-        
-        nx_ticks = max(10,size(SURVEYS,1));
-        ny_ticks = max(10,size(SURVEYS,1));
-        nz_ticks = size(weight_dpth,1);
+        if(isempty(USER_PREFERENCE_Subsurface_model_interpolation))
+            nx_ticks = max(10,size(SURVEYS,1));
+            ny_ticks = max(10,size(SURVEYS,1));
+            nz_ticks = size(weight_dpth,1);
+        else
+            nx_ticks = USER_PREFERENCE_Subsurface_model_interpolation(1);
+            ny_ticks = USER_PREFERENCE_Subsurface_model_interpolation(2);
+            nz_ticks = USER_PREFERENCE_Subsurface_model_interpolation(3);
+        end
+        if(isempty(USER_PREFERENCE_Subsurface_model_color_limits))
+            color_limits = [200, 3000];
+        else
+            color_limits = USER_PREFERENCE_Subsurface_model_color_limits;
+        end
+        if strcmp(USER_PREFERENCE_Subsurface_model_colormap,'')
+            color_map='Jet';
+        else
+            color_map=USER_PREFERENCE_Subsurface_model_colormap;
+        end
         %% results storage
         INIT_STORAGE();  
         %%
@@ -7024,6 +7083,14 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             figure_handle = H.gui;
             axes_handle = hAx_2Dprof;
         end
+        
+        set(figure_handle,'CurrentAxes',axes_handle);
+        hold(axes_handle,'off')
+        %% Visibility OFF
+        set(axes_handle, 'Visible','off');
+        cla(axes_handle)
+        %plot(0,0)
+        
         if(isempty(P.profile_ids))
             Message = ['Profiles not yet defined.'];
             msgbox(Message,'CREDITS:')
@@ -7048,10 +7115,6 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         % prepare profile        
         Pname = P.profile_name{Pid,1};
         if strcmp(Pname,'none'); Pname=strcat('profile-',num2str(Pid)); end
-        
-		set(figure_handle,'CurrentAxes',axes_handle);
-        hold(axes_handle,'off')
-        plot(0,0)
 
         %  quantity
         %  vp  vs  rho  xhx  Qp  Qs
@@ -7069,15 +7132,17 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         tmp = tmp(:, ids);
         rr = P.profile_ids{Pid,1}(:,2);% profile_ids(:,2);
         [bottom_Z] = imagenorm(tmp,  rr, zlevels, nx_ticks,nz_ticks, smoothing_strategy,smoothing_radius,  show_terrain,terrain_elevation);
-        
+        set(axes_handle.Children, 'Visible','Off') 
 		axis(axes_handle,'xy')
         hold(axes_handle,'on')
+        set(axes_handle.Children, 'Visible','Off') 
         
         %% bedrock mask
         if get(T5_P1_HsMask,'Value')
             polygonx = [rr(1); rr; rr(end)];
             polygony = [bottom_Z; bedrockline; bottom_Z]-0.2*min( abs(bottom_Z - bedrockline) );
-            fill(polygonx ,polygony, [0 0 0])
+            hdl = fill(polygonx ,polygony, [0 0 0]);
+            set(hdl, 'Visible','Off') 
         end
         %% layers boundaries
         if( get(h_togg_2D_layers_boundaries,'Value') )
@@ -7086,22 +7151,33 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                 Z = modeldepths(idp);
                 X =  rr(m) * ones(length(Z),1);
 
-                plot(axes_handle,  X,Z,'ow','LineWidth',3,'MarkerSize',5);
+                hdl = plot(axes_handle,  X,Z,'ow','LineWidth',3,'MarkerSize',5);
+                set(hdl, 'Visible','Off') 
             end
         end
         %% Bedrock line
         if( get(h_togg_2D_bedrock_line,'Value') )
-            plot(axes_handle,  rr,bedrockline,'o-w','LineWidth',3,'MarkerSize',5);
+            hdl = plot(axes_handle,  rr,bedrockline,'o-w','LineWidth',3,'MarkerSize',5);
+            set(hdl, 'Visible','Off') 
         end
         %% measurement points
         if( get(h_togg_measpoints,'Value') ) 
             for m = 1:size(P.profile_ids{Pid,1},1) 
                 recID = P.profile_ids{Pid,1}(m,1);
-                plot(rr(m), terrain_elevation(m),'og','markersize',7,'markerfacecolor','g')
-                text(rr(m), terrain_elevation(m), num2str(recID) )
+                hdl = plot(rr(m), terrain_elevation(m),'og','markersize',7,'markerfacecolor','g');
+                set(hdl, 'Visible','Off') 
+                
+                hdl = text(rr(m), terrain_elevation(m), num2str(recID) );
+                set(hdl, 'Visible','Off') 
             end
         end   
         title(str);
+        %% Colormap
+        if isempty(color_map); color_map = 'Jet'; end% fix colormap if not present
+        colormap(axes_handle, color_map);
+        %% Visibility ON
+         set(axes_handle, 'Visible','on');
+         set(axes_handle.Children, 'Visible','on');
 	end
     function plot_3d(newfigure, quantity)
         if(newfigure)
@@ -7116,6 +7192,8 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         
         set(figure_handle,'CurrentAxes',axes_handle);
         hold(axes_handle,'off')
+        %% Visibility OFF
+        set(axes_handle, 'Visible','off');
         plot(0,0)
        
         %  quantity
@@ -7145,6 +7223,14 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             hold on
             plot3(receiver_locations(:,1), receiver_locations(:,2), receiver_locations(:,3),'or');
         end
+        
+%MAYBE        for p=1:size(receiver_locations,1)
+%MAYBE            text(receiver_locations(p,1), receiver_locations(p,2), receiver_locations(p,3)+2, num2str(p))
+%MAYBE        end
+        %% Colormap
+        colormap(axes_handle, color_map);
+        %% Visibility ON
+         set(axes_handle, 'Visible','on');
     end
     function ViewerPostCallback(~,evd)%(obj,evd)
        viewerview= round(get(evd.Axes,'View'));
@@ -7156,7 +7242,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         % Zjvec     layers, or Z ticks not accounting elevation. (max(Zjvec)  is always 0)
         %
         %DATI(DATI == 0) = NaN;
-        
+        currentaxes = gca;
         [XBef,ZBef] = meshgrid(Xivec,Zjvec);
 
         xmi = min(Xivec);
@@ -7172,13 +7258,14 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
 
         %% smoothing
         [DAft] = prfsmoothing(DAft, smoothing_strategy,smoothing_radius);
-        
+        %save('my_Vs_profile.txt','DAft','-ascii')% <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ADD THIS !!!
         if show_terrain==0
             % OLD _____________________________________________________________________
             % image(xi,zi, DAft,'CDataMapping','scaled');
             % NEW______________________________________________________________________   
             lines1= linspace( min(min(DAft)), max(max(DAft)), 200 );
-            contourf( xi, zi, DAft, lines1, 'EdgeColor','none'); 
+            hdl = contourf( xi, zi, DAft, lines1, 'EdgeColor','none'); 
+            set(hdl, 'Visible','Off') 
             hold on
         end
         if show_terrain==1
@@ -7217,18 +7304,20 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             
             %% plot image
             lines1= linspace( min(min(DAft)), max(max(DAft)), 200 );
-            contourf( xi, newz, newM, lines1, 'EdgeColor','none'); 
+            contourf( xi, newz, newM, lines1, 'EdgeColor','none');
+            set(currentaxes.Children, 'Visible','Off') 
             hold on
             %% mask invalid sections
             %top
             polygonx = [Xivec(1); Xivec; Xivec(end)];
             polygony = [1.1*max_z; terrain_elevation; 1.1*max_z];
-            fill(polygonx ,polygony, [1 1 1])
+            hdl = fill(polygonx ,polygony, [1 1 1]);
+            set(hdl, 'Visible','Off') 
             %bottom
             polygonx = [Xivec(1); Xivec; Xivec(end)];
             polygony = [(min_z-0.1); (terrain_elevation-range(Zjvec)); (min_z-0.1)];
-            fill(polygonx ,polygony, [1 1 1])
-            
+            hdl = fill(polygonx ,polygony, [1 1 1]);
+            set(hdl, 'Visible','Off') 
         end
         caxis([min(min(DATI)), max(max(DATI))])
         % 

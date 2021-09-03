@@ -47,6 +47,8 @@ function [Matlab_Release,Matlab_Release_num, hTabGroup,SelectionChangeOption] = 
         case 2015.2%'2015b'
             hTabGroup = uitabgroup('Parent',gui_handle);
         case 2017.2%'2017b'
+            hTabGroup = uitabgroup('Parent',gui_handle);
+        case 2020.2%'2020b'
             hTabGroup = uitabgroup('Parent',gui_handle);    
         otherwise
             fprintf('=============================================\n')

@@ -22,7 +22,7 @@
 % Lateral constrained montecarlo inversion of HVSR data
 %
 
-function gui_2D(enable_menu,fontsizeis)   
+function gui_2D_210127(enable_menu,fontsizeis)   
 close all
 clc
 
@@ -2810,12 +2810,13 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             [boxx,boxy] = getsquare(weight_curv(1,1),weight_curv(L,1));
             drawsquare(hAx_cwf,boxx,boxy);
             
-            %[~,value] = ginput(1);% take points
-            if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
-                [~,value] = sam2018b_ginput(1);
-            else
-                [~,value] = ginput(1);
-            end
+%             %[~,value] = ginput(1);% take points
+%             if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
+%                 [~,value] = sam2018b_ginput(1);
+%             else
+%                 [~,value] = ginput(1);
+%             end
+            [~,value] = BackwordCompatible_ginput(Matlab_Release_num, 1, hAx_cwf);% <-(MRelease, N, haxis); 200127
             if(value<0); value = 0; end
             
             %% update
@@ -2907,12 +2908,13 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             [boxx,boxy] = getsquare(weight_dpth(1,1),weight_dpth(L,1));
             drawsquare(hAx_dwf,boxx,boxy);
             
-            %[~,value] = ginput(1);% take points
-            if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
-                [~,value] = sam2018b_ginput(1);
-            else
-                [~,value] = ginput(1);
-            end
+%             %[~,value] = ginput(1);% take points
+%             if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
+%                 [~,value] = sam2018b_ginput(1);
+%             else
+%                 [~,value] = ginput(1);
+%             end             
+            [~,value] = BackwordCompatible_ginput(Matlab_Release_num, 1, hAx_dwf);% <-(MRelease, N, haxis); 200127
             if(value<0); value = 0; end
             
             %% update
@@ -2974,12 +2976,14 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         end
     end
     function BT_insert_break(~,~,~)
-        %[xval,~] = ginput(1);
-        if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
-            [xval,~] = sam2018b_ginput(1);
-        else
-            [xval,~] = ginput(1);
-        end
+%         %[xval,~] = ginput(1);
+%         if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
+%             [xval,~] = sam2018b_ginput(1);
+%         else
+%             [xval,~] = ginput(1);
+%         end
+        [xval,~] = BackwordCompatible_ginput(Matlab_Release_num, 1);% <-(MRelease, N, haxis); 200127
+        
         %;% take points
         for m = 2:size(SURVEYS,1)
             x0 = SURVEYS{m-1,1}(1);
@@ -2995,11 +2999,13 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
     end
     function BT_delete_breaks(~,~,~)
         %[xval,~] = ginput(1);
-        if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
-            [xval,~] = sam2018b_ginput(1);
-        else
-            [xval,~] = ginput(1);
-        end
+%         if Matlab_Release_num>2018% Solve ginput issuewith R2018a and above
+%             [xval,~] = sam2018b_ginput(1);
+%         else
+%             [xval,~] = ginput(1);
+%         end
+        [xval,~] = BackwordCompatible_ginput(Matlab_Release_num, 1);% <-(MRelease, N, haxis); 200127
+        
         %;% take points
         for m = 2:size(SURVEYS,1)
             x0 = SURVEYS{m-1,1}(1);
