@@ -23,7 +23,7 @@ function [xx,yy] = BackwordCompatible_ginput(MRelease, N, haxis)
     %% 2017A - 2018B
     if (2017.1 <= MRelease) && (MRelease <= 2018.2)
         % Solve the 2017 issue by using the 2018B ginput version
-        [xx,yy] = sam2018b_ginput(N, haxis);
+        [xx,yy] = SAM_2018b_ginput(N, haxis);
         return
     end  
     

@@ -1,4 +1,4 @@
-function [c,ww] = SAM_smooth(varargin)
+function [c,ww] = SAM_2018a_smooth(varargin)
 %SMOOTH  Smooth data.
 %   Z = SMOOTH(Y) smooths data Y using a 5-point moving average.
 %

@@ -1,12 +1,12 @@
 function [OUT] = prfsmoothing(IN, smoothing_strategy,smoothing_radius)
-
-
+    % Author: Samuel Bignardi Ph.D.
+    
 
     %% Smoothing ===========================================================
     nex = size(IN,2);
     nez = size(IN,1);
     r = smoothing_radius;
-    SMOOTH = 0*IN;
+    SMOOTHMX = 0*IN;
     switch smoothing_strategy
         case 1
             %fprintf('Smoothing -1- layerwise\n');
@@ -17,7 +17,7 @@ function [OUT] = prfsmoothing(IN, smoothing_strategy,smoothing_radius)
 
                     is = imin:imax;
                     vals = IN(k,is);
-                    SMOOTH(k,i) = sum( vals )/sum( vals>0 );
+                    SMOOTHMX(k,i) = sum( vals )/sum( vals>0 );
                 end
             end
         case 2
@@ -33,7 +33,7 @@ function [OUT] = prfsmoothing(IN, smoothing_strategy,smoothing_radius)
                     is = imin:imax;
                     ks = kmin:kmax;
                     vals = IN(ks,is); 
-                    SMOOTH(k,i) = sum( vals )/sum( vals>0 );
+                    SMOOTHMX(k,i) = sum( vals )/sum( vals>0 );
                 end
             end            
         case 3
@@ -49,14 +49,14 @@ function [OUT] = prfsmoothing(IN, smoothing_strategy,smoothing_radius)
                     is = imin:imax;
                     ks = kmin:kmax;
                     vals = IN(ks,is); 
-                    SMOOTH(k,i) = sum( vals )/sum( vals>0 );
+                    SMOOTHMX(k,i) = sum( vals )/sum( vals>0 );
                 end
             end
        otherwise
-            SMOOTH = IN;
+            SMOOTHMX = IN;
             %fprintf('Smoothing -0- NOT PERFORMED\n');
     end
-    OUT = SMOOTH;
+    OUT = SMOOTHMX;
     %fname = strcat(colorkind,'_dir',dir,'_shot',sh,'.mat');
     %save(fname);
 end

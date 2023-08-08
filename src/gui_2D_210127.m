@@ -231,9 +231,9 @@ view_min_scale = 0;
 view_max_scale = 100;
 
 init_value__fref                = '30';
-init_value__dscale              = '0.1';
-init_value__min_scale           = '0.4';
-init_value__max_scale           = '4';
+init_value__dscale              = '0.25';
+init_value__min_scale           = '0.25';
+init_value__max_scale           = '20';
 
 max_lat_dVp = 100; 
 max_lat_dVs =  50;
@@ -278,8 +278,8 @@ uimenu(h0,'Label','HVSR files format','Callback',{@Menu_File_Set_file_format});
 %
 uimenu(h0,'Label','Save Subsurface Model as .txt set','Callback',{@Menu_Model_Save_txt_set}, ...
 'Separator','on');
-uimenu(h0,'Label','Save Modeled Curves (P/S) as txt','Callback',{@Menu_Curve_Save_txt_set});
-uimenu(h0,'Label','Save Modeled Curves (SW) as txt', ...
+uimenu(h0,'Label','Save Modeled Curves (P/S) as txt. NOTE: press "MODEL (P/S)" button for the response of the current subsurface model)','Callback',{@Menu_Curve_Save_txt_set});
+uimenu(h0,'Label','Save Modeled Curves (SW) as txt. NOTE: press "MODEL (P/S)" button for the response of the current subsurface model)', ...
 'Enable',FLAG__PC_features,'Callback',{@Menu_Curve_Save_txt_set_sw});
 
 uimenu(h0,'Label','Save as new project','Callback',{@Menu_Save_as_newproject_set});
@@ -2591,7 +2591,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                   fullMisfit = 0; fuller = 0;
                   for m = 1:Nsurveys
                     %% ========================================================
-                    % as_Samuel(c,ro,h,q,ex,fref,f)  
+                    % BodyWavesForwardModel(c,ro,h,q,ex,fref,f)  
                     VP = last_MDLS{m}(:,1);
                     VS = last_MDLS{m}(:,2);
                     RO = last_MDLS{m}(:,3);
@@ -2599,8 +2599,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                     QP = last_MDLS{m}(:,5);
                     QS = last_MDLS{m}(:,6);
 
-                    aswave = as_Samuel(VS,RO,HH,QS,ex,fref, x_vec);
-                    apwave = as_Samuel(VP,RO,HH,QP,ex,fref, x_vec);
+                    aswave = BodyWavesForwardModel(VS,RO,HH,QS,ex,fref, x_vec);
+                    apwave = BodyWavesForwardModel(VP,RO,HH,QP,ex,fref, x_vec);
                     last_FDAT{m,1} = FDAT{m,1};
                     
                     %warning('interpolation here');
@@ -3761,8 +3761,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
             QP = M0(:,5);
             QS = M0(:,6);
 
-            aswave = as_Samuel(VS,RO,HH,QS,ex,fref, x_vec);
-            apwave = as_Samuel(VP,RO,HH,QP,ex,fref, x_vec);
+            aswave = BodyWavesForwardModel(VS,RO,HH,QS,ex,fref, x_vec);
+            apwave = BodyWavesForwardModel(VP,RO,HH,QP,ex,fref, x_vec);
             hvsr_teo = (aswave./apwave);
             hvsr_teo = interp1(x_vec, hvsr_teo, SN_xscale).';% store teo curves(future plots)
             misfit_vs_f0 = (hvsr_teo - curve_data).^2;
@@ -3778,8 +3778,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
                 QP = M0(:,5);
                 QS = M0(:,6);
 
-                aswave = as_Samuel(VS,RO,HH,QS,ex,fref, x_vec);
-                apwave = as_Samuel(VP,RO,HH,QP,ex,fref, x_vec);
+                aswave = BodyWavesForwardModel(VS,RO,HH,QS,ex,fref, x_vec);
+                apwave = BodyWavesForwardModel(VP,RO,HH,QP,ex,fref, x_vec);
 
                 hvsr_teo = (aswave./apwave);
                 hvsr_teo = interp1(x_vec, hvsr_teo, SN_xscale).';% store teo curves(future plots)
@@ -4454,7 +4454,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         ex   = str2double( get(h_ex_val,  'String') );
         fref = str2double( get(h_fref_val,'String') );
         
-        % as_Samuel(c,ro,h,q,ex,fref,f)  
+        % BodyWavesForwardModel(c,ro,h,q,ex,fref,f)  
         VP = MDL(:,1);
         VS = MDL(:,2);
         RO = MDL(:,3);
@@ -4462,8 +4462,8 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         QP = MDL(:,5);
         QS = MDL(:,6);
 
-        aswave = as_Samuel(VS,RO,HH,QS,ex,fref, x_vec);
-        apwave = as_Samuel(VP,RO,HH,QP,ex,fref, x_vec);
+        aswave = BodyWavesForwardModel(VS,RO,HH,QS,ex,fref, x_vec);
+        apwave = BodyWavesForwardModel(VP,RO,HH,QP,ex,fref, x_vec);
         hvsr_teo = (aswave./apwave);
 
         OUT1{1} = main_scale;
@@ -4480,7 +4480,7 @@ if isfield(BIN,'zlevels'); zlevels = BIN.zlevels; end
         xmax = str2double( get(h_scale_max,'String') );
         ddx   = str2double( get(h_dscale,  'String') );
         
-        % as_Samuel(c,ro,h,q,ex,fref,f)  
+        % BodyWavesForwardModel(c,ro,h,q,ex,fref,f)  
         VP = MDL(:,1);
         VS = MDL(:,2);
         RO = MDL(:,3);

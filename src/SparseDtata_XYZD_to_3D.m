@@ -45,7 +45,8 @@ function [XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,n
     Z = reshape( Z, L,1);
     D = reshape( D, L,1);
     
-    VM = griddata3( X, Y, Z, D, XM,YM,ZM, 'nearest');
+    % VM = griddata3( X, Y, Z, D, XM,YM,ZM, 'nearest');
+    VM = SAM_2022b_griddata3( X, Y, Z, D, XM,YM,ZM, 'nearest');
     VM = smooth3(VM,'box',5);
     correct_for_surface(meshed_surface);
     trim_edges();
@@ -76,7 +77,7 @@ function [XM,YM,ZM,VM xq,yq,zq] = SparseDtata_XYZD_to_3D(surface_locations,Z,D,n
     ylim([min(surface_locations(:,2)), max(surface_locations(:,2))]); hold off
     %zlim([min(surface_locations(:,3)), max(surface_locations(:,3))]); hold on
     hold off
-    fprintf('done')
+    %fprintf('done')
    
     
     %% SUBFUNCTIONS

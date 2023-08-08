@@ -42,7 +42,7 @@ load HVratio
 % HVSR=aswave./apwave;
 % semilogx(HVratio(:,1),smooth(HVratio(:,2),5),'r',f,HVSR)
 hold on
-hswhvsr=semilogx(HVratio(:,1),smooth(HVratio(:,2),nsmooth),'g')
+hswhvsr=semilogx(HVratio(:,1),smooth(HVratio(:,2),nsmooth),'g');% If error: smooth -> SAM_2018a_smooth
 set(hswhvsr,'linewidth',2)
 grid on
 hold off

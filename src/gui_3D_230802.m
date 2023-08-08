@@ -20,8 +20,12 @@
 %
 %
 % Lateral constrained montecarlo inversion of HVSR data
-function gui_3D_210127()  
-
+%
+%
+%  Changelog:
+%  230802   Small interface changes
+%
+function gui_3D_230802()  
 close all
 clc
 %% to load project
@@ -119,10 +123,13 @@ cutplanes       = [0,1, 0,1, 0,1];             % (3D) sliders for slicing
 %isslice         = cutplanes;                  % (3D) coordinates for slicing     
 %r_distance_from_profile = 50;                  % (3D) 
 Flag__stop_inversion = 0;
+Flag__FWD_toggle_PSAmplification = 0;          % 230802 Turn showing curves ON/OFF in local inversion TAB, Panel C.
+Flag__FWD_PS_toggle_HVCurve = 1;               % 230802 Turn showing curves ON/OFF in local inversion TAB, Panel C.
+Flag__FWD_SW_toggle_HVCurve = 1;               % 230802 Turn showing curves ON/OFF in local inversion TAB, Panel C.
 %
 %
 %% USER_PREFERENCE_interface_objects_fontsize is NEW
-%% P is new
+%% P info container
 P.isshown.id      = 0;
 %
 P.profile.id      = 0;
@@ -212,7 +219,7 @@ smoothing_strategy = 3;
 smoothing_radius   = 3;
 viewerview = [ -37.5, 30.0];
 %
-%% Get USER preferences
+%% Fetch USER preferences
 USER_PREFERENCE_Move_over_suggestions      = '';
 USER_PREFERENCE_interface_objects_fontsize = 0; 
 USER_PREFERENCE_enable_Matlab_default_menu = 0;
@@ -264,9 +271,9 @@ view_min_scale = 0;
 view_max_scale = 100;
 
 init_value__fref                = '30';
-init_value__dscale              = '0.1';
-init_value__min_scale           = '0.4';
-init_value__max_scale           = '4';
+init_value__dscale              = '0.25';
+init_value__min_scale           = '0.25';
+init_value__max_scale           = '20';
 
 max_lat_dVp = 100; 
 max_lat_dVs =  50;
@@ -307,9 +314,9 @@ uimenu(h0,'Label','HVSR files format','Callback',{@Menu_File_Set_file_format});
 %
 uimenu(h0,'Label','Save Subsurface Model as .txt set','Callback',{@Menu_Model_Save_txt_set}, ...
 'Separator','on');
-uimenu(h0,'Label','Save Modeled Curves (P/S) as txt','Callback',{@Menu_Curve_Save_txt_set});
-uimenu(h0,'Label','Save Modeled Curves (SW) as txt', ...
-'Enable',FLAG__PC_features,'Callback',{@Menu_Curve_Save_txt_set_sw});
+uimenu(h0,'Label','Save Modeled Curves (P/S) as txt. NOTE: press "MODEL (P/S)" button for the response of the current subsurface model)','Callback',{@Menu_Curve_Save_Modeled_txt_set_ps});
+uimenu(h0,'Label','Save Modeled Curves (SW) as txt. NOTE: press "MODEL (SW)" button for the response of the current subsurface model)', ...
+'Enable',FLAG__PC_features,'Callback',{@Menu_Curve_Save_Modeled_txt_set_sw});
 
 uimenu(h0,'Label','Save as new project','Callback',{@Menu_Save_as_newproject_set});
 %
@@ -317,8 +324,8 @@ uimenu(h0,'Label','Save Elaboration',  'Callback',{@Menu_Save_elaboration},'Sepa
 uimenu(h0,'Label','Resume Elaboration','Callback',{@Menu_Load_elaboration});
 %%    Settings
 h1  = uimenu(H.gui,'Label','Settings');
-uimenu(h1,'Label','Setup','Callback',{@Menu_Settings_Setup});
-uimenu(h1,'Label','Objective Func.','Callback',{@Menu_Settings_objective});
+uimenu(h1,'Label','General Setup','Callback',{@Menu_Settings_Setup});
+uimenu(h1,'Label','Objective Function Weights','Callback',{@Menu_Settings_objective});
 %%    View
 %%        HVSR curve
 h5  = uimenu(H.gui,'Label','View');
@@ -326,6 +333,11 @@ h51 = uimenu(h5,'Label','HVSR');
 uimenu(h51,'Label','View Freq. range','Callback',{@Menu_view_xcurverange_custom});
 uimenu(h51,'Label','Fit view to processed data','Callback',{@Menu_view_xcurverange_fitprocessed});
 uimenu(h51,'Label','Fit view all data','Callback',{@Menu_view_xcurverange_fitdata});
+
+uimenu(h51,'Label','Forward-Model (PS) curves: Toggle P,S amplification','Callback',{@Menu_view_xcurveTogglePSAmplification}, 'Separator','on');% 230802
+uimenu(h51,'Label','Forward-Model (PS) curves: Toggle H/V','Callback',{@Menu_view_xcurveToggleHV_PS});% 230802
+uimenu(h51,'Label','Forward-Model (SW) curves: Toggle H/V','Callback',{@Menu_view_xcurveToggleHV_SW});% 230802
+
 %%        SUBSURFACE view
 h52 = uimenu(h5,'Label','Subsurface');
 %%            Interpolation
@@ -347,8 +359,8 @@ eh52_childs(4) = uimenu(eh52,'Label','Bubble','Callback',     {@Menu_smoothing_s
 
 
 %%    Extra
-h7  = uimenu(H.gui,'Label','Extra');
-uimenu(h7,'Label','Schreenshot','Callback',{@funct_saveimage});
+% DEPRECATED: h7  = uimenu(H.gui,'Label','Extra');
+% DEPRECATED: uimenu(h7,'Label','Schreenshot','Callback',{@funct_saveimage});
 %%    About
 H.menu.credits  = uimenu(H.gui,'Label','Credits','Callback',{@Menu_About_Credits});
 %%
@@ -890,7 +902,7 @@ hAx_dwf= axes('Parent',H.PANELS{P.tab_id}.B,'Units','normalized', ...
     'Position', Position_Axes, ...
     'uicontextmenu',hAx_dwf_hcmenu, ...
     'title','Depth Weights');
-%%    Panel-C   Misfit view
+%%    Panel-C  Misfit view
 %           general misfit
 pos_axes3 = [0.1 0.15  0.35 0.8];
 hAx_MvsIT_hcmenu_full = uicontextmenu;
@@ -961,7 +973,7 @@ h_1d_enable =uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'St
     'String','Enable', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
     'Callback',{@CM_hAx_geo_enable});
-%% NEW BUTTON, look side effects: CM_hAx_keep_and_spread_to  
+%% NEW BUTTON, BETA: check for unwanted interactions: CM_hAx_keep_and_spread_to  
 h_1d_spreadTO = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Spread to:', ...
     'Enable','on', ... 
@@ -977,32 +989,32 @@ h_1d_Unlock = uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'S
     'String','Unlock Model', ...
     'Units','normalized','Position',[objx(2), objy(row), objw(2), objh], ...
     'Callback',{@B_unlock_model});
-%% NEW BUTTON, look side effects: CM_hAx_double_all_layers
+%% NEW BUTTON, BETA: check for unwanted interactions: CM_hAx_double_all_layers
 uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Double layers', ...
     'Enable',P.ExtraFeatures.beta_stuff_enable_status, ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh], ...
     'Callback',{@CM_hAx_double_all_layers});
-%% NEW BUTTON, look side effects: CM_hAx_double_a_layer
+%% NEW BUTTON, BETA: check for unwanted interactions: CM_hAx_double_a_layer
 uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Double layer', ...
     'Enable',P.ExtraFeatures.beta_stuff_enable_status, ...
     'Units','normalized','Position',[objx(4), objy(row), objw(4), objh], ...
     'Callback',{@CM_hAx_double_a_layer});
 %
-%% NEW BUTTON, look side effects: CM_hAx_keep_unite_all_layers
+%% NEW BUTTON, BETA: check for unwanted interactions: CM_hAx_keep_unite_all_layers
 uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Unite layers', ...
     'Enable',P.ExtraFeatures.beta_stuff_enable_status, ...
     'Units','normalized','Position',[objx(3), objy(row), objw(3), objh], ...
     'Callback',{@CM_hAx_keep_unite_all_layers});
-%% NEW BUTTON, look side effects: CM_hAx_keep_and_unite_two_layers
+%% NEW BUTTON, BETA: check for unwanted interactions: CM_hAx_keep_and_unite_two_layers
 uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Unite two layers', ...
     'Enable',P.ExtraFeatures.beta_stuff_enable_status, ...
     'Units','normalized','Position',[objx(4), objy(row), objw(4), objh], ...
     'Callback',{@CM_hAx_keep_and_unite_two_layers});
-%% NEW BUTTON, look side effects: CM_hAx_keep_Equate_layer_number
+%% NEW BUTTON, BETA: check for unwanted interactions: CM_hAx_keep_Equate_layer_number
 row = row+1;
 uicontrol('FontSize',USER_PREFERENCE_interface_objects_fontsize,'Style','pushbutton','parent',H.PANELS{P.tab_id}.A, ...
     'String','Equate N of layers', ...
@@ -1086,6 +1098,9 @@ uimenu(hAx_dat_hcmenu, 'Label', 'Discard data',   'Callback', @CM_hAx_dat_disabl
 uimenu(hAx_dat_hcmenu, 'Label', 'Restore data',   'Callback', @CM_hAx_dat_enable, 'Separator','on');
 uimenu(hAx_dat_hcmenu, 'Label', 'Show linear',    'Callback', @CM_hAx_dat_show_lin);
 uimenu(hAx_dat_hcmenu, 'Label', 'Show logaritmic','Callback', @CM_hAx_dat_show_log);
+% OPTIONAL uimenu(hAx_dat_hcmenu, 'Label', 'Forward-Model (PS) curves: Toggle P,S amplification','Callback', @Menu_view_xcurveTogglePSAmplification, 'Separator','on');% 230802
+% OPTIONAL uimenu(hAx_dat_hcmenu, 'Label', 'Forward-Model (PS) curves: Toggle H/V','Callback', @Menu_view_xcurveToggleHV_PS);% 230802
+% OPTIONAL uimenu(hAx_dat_hcmenu, 'Label', 'Forward-Model (SW) curves: Toggle H/V','Callback', @Menu_view_xcurveToggleHV_SW);% 230802
 uimenu(hAx_dat_hcmenu, 'Label', 'Edit externally','Callback', {@plot_extern,4}, 'Separator','on');
 pos_axes = [0.1 0.1 0.8 0.8];
 hAx_dat= axes('Parent',H.PANELS{P.tab_id}.C,'Units', 'normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',pos_axes,'uicontextmenu',hAx_dat_hcmenu);
@@ -1096,7 +1111,7 @@ pos_table = [0   0  1  1];
 %
 hTab_mod_cnames = {'Vp','Vs','Rho','H','Qp','Qs','Depth'};
 hTab_mod_hcmenu = uicontextmenu;
-uimenu(hTab_mod_hcmenu, 'Label', 'Modify',   'Callback', @CM_hAx_mod_modify);
+uimenu(hTab_mod_hcmenu, 'Label', 'Manually Modify Subsurface Parameters',   'Callback', @CM_hAx_mod_modify);
 hTab_mod= uitable('Parent',H.PANELS{P.tab_id}.D,'ColumnName',hTab_mod_cnames,'Units','normalized','Units','normalized','Position',pos_table, ...
     'uicontextmenu',hTab_mod_hcmenu, ...
     'FontSize',USER_PREFERENCE_interface_objects_fontsize,'ColumnFormat',{'bank','bank','bank','bank','bank','bank','bank'}, ...
@@ -1309,7 +1324,7 @@ row = row+2;
 h_togg_terrain = uicontrol('Style','radiobutton','parent',H.PANELS{P.tab_id}.A,'Units','normalized', ...
     'FontSize',USER_PREFERENCE_interface_objects_fontsize, ... 
     'Value',1, ...
-    'String','Terrain', ...
+    'String','Terrain elevation', ...
     'Position',[objx, objy(row), objw, objh],'Callback',{@BT_refresh_modelview});
 row = row+1;
 h_togg_measpoints = uicontrol('Style','radiobutton','parent',H.PANELS{P.tab_id}.A,'Units','normalized', ...
@@ -1823,7 +1838,7 @@ Pfunction__publish_gui(H.gui,H.menu.credits,P.appname_3D,P.appversion_3D);
             end
         end    
     end
-    function Menu_Curve_Save_txt_set(~,~,~)
+    function Menu_Curve_Save_Modeled_txt_set_ps(~,~,~)
         folder_name = uigetdir(working_folder);
         if(folder_name)
             %modl_FDAT   = multiple_fwd_model();
@@ -1841,7 +1856,7 @@ Pfunction__publish_gui(H.gui,H.menu.credits,P.appname_3D,P.appversion_3D);
             
         end
     end
-    function Menu_Curve_Save_txt_set_sw(~,~,~)
+    function Menu_Curve_Save_Modeled_txt_set_sw(~,~,~)
         folder_name = uigetdir(working_folder);
         if(folder_name)
             %modl_FDATSW = multiple_fwd_model_sw();
@@ -2990,21 +3005,28 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
     end
     function Menu_Settings_objective(~,~,~)
         if ~isempty(inversion_is_started__inedipendent)
-	       if(~strcmp(inversion_is_started__inedipendent,''))
-		   quest = 'These parameters must be set before the inversion is started and should not be modified afterwards. Continue?';
-		   answer = questdlg(quest);
-		   if strcmp(answer,'No'); return; end
-		   if strcmp(answer,'Cancel'); return; end
-	       end
-	    end
-        
-        prompt = {'Curve Term %','Slope Term %'};
-        def = {num2str(Misfit_curve_term_w), num2str(Misfit_slope_term_w)};
-        answer = inputdlg(prompt,'Set Misfit Approach',1,def);
-        if(~isempty(answer))
-            Misfit_curve_term_w = str2double(answer{1});        
-            Misfit_slope_term_w = str2double(answer{2});
+            if(~strcmp(inversion_is_started__inedipendent,''))
+                quest = 'These parameters must be set before the inversion is started and should not be modified afterwards. Continue?';
+                answer = questdlg(quest);
+                if strcmp(answer,'No'); return; end
+                if strcmp(answer,'Cancel'); return; end
+            end
         end
+        
+        WgtOut = dlgMisfitWeighting(Misfit_curve_term_w,Misfit_slope_term_w,USER_PREFERENCE_interface_objects_fontsize);
+        Misfit_curve_term_w = WgtOut(1);
+        Misfit_slope_term_w = WgtOut(2);
+
+% Commented on 230802
+%         prompt = {'Curve Term %','Slope Term %'};
+%         def = {num2str(Misfit_curve_term_w), num2str(Misfit_slope_term_w)};
+%         %answer = inputdlg(prompt,'Set Misfit Approach',1,def);
+%         answer = SAM_inputdlg__Dependent_Choice(prompt,'Set Misfit Components',1,def);
+%         if(~isempty(answer))
+%             Misfit_curve_term_w = str2double(answer{1});        
+%             Misfit_slope_term_w = str2double(answer{2});
+%         end
+% --------------------------------------------------
     end
 %%      View
 %%          interpolation
@@ -3603,7 +3625,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
               fullSlope_term = 0;% 190410
               for m = 1:Nsurveys
                 %% ========================================================
-                % as_Samuel(c,ro,h,q,ex,fref,f)  
+                % BodyWavesForwardModel(c,ro,h,q,ex,fref,f)  
                 VP = last_MDLS{m}(:,1);
                 VS = last_MDLS{m}(:,2);
                 RO = last_MDLS{m}(:,3);
@@ -3611,8 +3633,8 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                 QP = last_MDLS{m}(:,5);
                 QS = last_MDLS{m}(:,6);
 
-                aswave = as_Samuel(VS,RO,HH,QS,ex,fref, x_vec);
-                apwave = as_Samuel(VP,RO,HH,QP,ex,fref, x_vec);
+                aswave = BodyWavesForwardModel(VS,RO,HH,QS,ex,fref, x_vec);
+                apwave = BodyWavesForwardModel(VP,RO,HH,QP,ex,fref, x_vec);
                 %last_FDAT{m,1} = FDAT{m,1};
                 %warning('interpolation here');
                 hvsr_teo = (aswave./apwave);
@@ -3707,10 +3729,10 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             
             bgc = 0.9*[1 1 1];
             set(T2_P1_inv_button_bw,'BackgroundColor',bgc,'enable','on')
-            set(T2_P1_inv_button_sw,'enable','on')
+            if(strcmp(FLAG__PC_features,'on')); set(T2_P1_inv_button_sw,'enable','on'); end
             %
             set(h_fwd_bw ,'enable','on')
-            set(h_fwd_sw ,'enable','on')
+            if(strcmp(FLAG__PC_features,'on')); set(h_fwd_sw ,'enable','on'); end
             set(T2_P1_inv_button_lw,'enable','on')
             %
             set(T2_P1_inv_stop,'enable','off')
@@ -4343,6 +4365,20 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             Show_survey(0)
         end
     end
+    %
+    function Menu_view_xcurveTogglePSAmplification(~,~,~)% 230802
+        if Flag__FWD_toggle_PSAmplification==1; Flag__FWD_toggle_PSAmplification=0; else; Flag__FWD_toggle_PSAmplification=1; end
+        Show_survey(0)
+    end
+    function Menu_view_xcurveToggleHV_PS(~,~,~)% 230802
+        if Flag__FWD_PS_toggle_HVCurve==1; Flag__FWD_PS_toggle_HVCurve=0; else; Flag__FWD_PS_toggle_HVCurve=1; end
+        Show_survey(0)
+    end
+    function Menu_view_xcurveToggleHV_SW(~,~,~)% 230802
+        if Flag__FWD_SW_toggle_HVCurve==1; Flag__FWD_SW_toggle_HVCurve=0; else; Flag__FWD_SW_toggle_HVCurve=1; end
+        Show_survey(0)
+    end
+
 %% TAB-3, Panel-3: model
     function CM_hAx_mod_modify(~,~,~)
         if(isempty(MDLS)); return; end
@@ -5119,7 +5155,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         
         pcv = str2double(get(hsns_bound,'String'));% variation
         pcs = str2double(get(hsns_step,'String'));%  step
-        warning('Samuel: set physical bounds here')
+%        warning('Samuel: set physical bounds here')
         
         maxv = SN_centralval*(1 + pcv/100);  
         minv = SN_centralval*(1 - pcv/100);
@@ -5147,8 +5183,8 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             QP = M0(:,5);
             QS = M0(:,6);
 
-            aswave = as_Samuel(VS,RO,HH,QS,ex,fref, x_vec);
-            apwave = as_Samuel(VP,RO,HH,QP,ex,fref, x_vec);
+            aswave = BodyWavesForwardModel(VS,RO,HH,QS,ex,fref, x_vec);
+            apwave = BodyWavesForwardModel(VP,RO,HH,QP,ex,fref, x_vec);
             hvsr_teo = (aswave./apwave);
             hvsr_teo = interp1(x_vec, hvsr_teo, SN_xscale).';% store teo curves(future plots)
             misfit_vs_f0 = (hvsr_teo - curve_data).^2;
@@ -5164,8 +5200,8 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                 QP = M0(:,5);
                 QS = M0(:,6);
 
-                aswave = as_Samuel(VS,RO,HH,QS,ex,fref, x_vec);
-                apwave = as_Samuel(VP,RO,HH,QP,ex,fref, x_vec);
+                aswave = BodyWavesForwardModel(VS,RO,HH,QS,ex,fref, x_vec);
+                apwave = BodyWavesForwardModel(VP,RO,HH,QP,ex,fref, x_vec);
 
                 hvsr_teo = (aswave./apwave);
                 hvsr_teo = interp1(x_vec, hvsr_teo, SN_xscale).';% store teo curves(future plots)
@@ -5429,11 +5465,6 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         end
         
         hold(hhdl,'on')
-%         if(hhdl==hAx_main_geo) || (hhdl==hAx_geo)
-%             set(H.gui,'CurrentAxes',hhdl);
-%         end
-%         hold(hhdl,'off')
-        %
         Nhv = size(SURVEYS,1);
         XY= zeros(Nhv,2);
         for ri = 1:Nhv; XY(ri,1:2) = SURVEYS{ri,1}(1:2); end
@@ -5446,7 +5477,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                 
             plot(hhdl, XY(p,1), XY(p,2), 'marker','o','markerfacecolor',colr,'markersize',8); 
             hold(hhdl,'on')
-            text(XY(p,1), XY(p,2)+0.1, strcat('R',num2str(p)),'HorizontalAlignment','left');
+            text(XY(p,1), XY(p,2)+0.1, strcat('--',num2str(p)),'HorizontalAlignment','left');
         end
         %% plot selected data
         if (P.isshown.id > 0)
@@ -5534,7 +5565,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             end
             plot(XY(p,1), XY(p,2), 'marker','o','Color',colr,'markerfacecolor',colr,'markersize',8);
             hold(hhdl,'on')
-            text(XY(p,1), XY(p,2), strcat(' R',num2str(p)),'HorizontalAlignment','left');
+            text(XY(p,1), XY(p,2), strcat('--',num2str(p)),'HorizontalAlignment','left');
         end
         %% subset profile
         %plot(hhdl, P.profile_line{P.profile.id,1}(:,1), P.profile_line{P.profile.id,1}(:,2),'r','linewidth',2); hold(hhdl,'on')
@@ -5729,7 +5760,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                 %% show simple modeled (last user pressed 'MODEL' button P/S waves)
                 if(~isempty(modl_FDAT))
                     if(size(modl_FDAT,2)>2)
-                        if(~isempty(modl_FDAT{1,3}))
+                        if(~isempty(modl_FDAT{1,3}) && Flag__FWD_toggle_PSAmplification)
                             %% P-amp
                             show_curve = abs( modl_FDAT{P.isshown.id,3}(ixmin_id:ixmax_id) );
                             if(max(show_curve) >= min(show_curve))
@@ -5741,7 +5772,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                                 end
                             end
                         end
-                        if(~isempty(modl_FDAT{1,4}))
+                        if(~isempty(modl_FDAT{1,4}) && Flag__FWD_toggle_PSAmplification)
                             %% S-amp
                             show_curve = abs( modl_FDAT{P.isshown.id,4}(ixmin_id:ixmax_id) );
                             if(max(show_curve) >= min(show_curve))
@@ -5754,7 +5785,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                             end
                         end
                     end
-                    if(~isempty(modl_FDAT{1,2}))
+                    if(~isempty(modl_FDAT{1,2}) && Flag__FWD_PS_toggle_HVCurve)
                         %% HVSR model
                         lgnd = [lgnd; 'model-P/S'];
                         show_curve = abs( modl_FDAT{P.isshown.id,2}(ixmin_id:ixmax_id) );
@@ -5769,7 +5800,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                 end
                 %% surface waves
                 if(~isempty(modl_FDATSW))
-                    if(~isempty(modl_FDATSW{1,2}))
+                    if(~isempty(modl_FDATSW{1,2})  && Flag__FWD_SW_toggle_HVCurve)
                         %% HVSR model
                         lgnd = [lgnd; ' model-SW'];
                         show_xvec  = modl_FDATSW{P.isshown.id,1};% (ixmin_id:ixmax_id) );
@@ -6011,7 +6042,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         x_vec = get_x_ranges();
         %x_vec
         OUT = cell(size(SURVEYS,1),2);
-        for m = 1:size(SURVEYS,1);
+        for m = 1:size(SURVEYS,1)
             % VP VS RO HH QP QS
             MDL = MDLS{m};
             OUT1 = single_fwd_model(MDL,x_vec);%,ddx);
@@ -6045,7 +6076,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         ex   = str2double( get(h_ex_val,  'String') );
         fref = str2double( get(h_fref_val,'String') );
         
-        % as_Samuel(c,ro,h,q,ex,fref,f)  
+        % BodyWavesForwardModel(c,ro,h,q,ex,fref,f)  
         VP = MDL(:,1);
         VS = MDL(:,2);
         RO = MDL(:,3);
@@ -6053,8 +6084,8 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         QP = MDL(:,5);
         QS = MDL(:,6);
 
-        aswave = as_Samuel(VS,RO,HH,QS,ex,fref, x_vec);
-        apwave = as_Samuel(VP,RO,HH,QP,ex,fref, x_vec);
+        aswave = BodyWavesForwardModel(VS,RO,HH,QS,ex,fref, x_vec);
+        apwave = BodyWavesForwardModel(VP,RO,HH,QP,ex,fref, x_vec);
         hvsr_teo = (aswave./apwave);
 
         OUT1{1} = main_scale;
@@ -6071,7 +6102,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         xmax = str2double( get(h_scale_max,'String') );
         ddx   = str2double( get(h_dscale,  'String') );
         
-        % as_Samuel(c,ro,h,q,ex,fref,f)  
+        % BodyWavesForwardModel(c,ro,h,q,ex,fref,f)  
         VP = MDL(:,1);
         VS = MDL(:,2);
         RO = MDL(:,3);
@@ -6124,6 +6155,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         dzmax = dzmax +5;%%  5 meters to represent HS
     end
     function model_manager(data)
+        %% Handle manual changes to the subsurface model  
         newdata = data;
         OUT1 = [];
         DSP = get(0,'ScreenSize');
@@ -6137,25 +6169,40 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         P1 = uipanel(hdiag,'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[ 0.2, 0, 0.4, 1]);
         P2 = uipanel(hdiag,'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position',[ 0.6, 0, 0.4, 1]);
 
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Quit','Position',[0., 0.69, 1, 0.03], ...
+        hQuit = uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Discard changes and Quit','Position',[0., 0.69, 1, 0.03], ...
             'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_quit});
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Revert','Position',[0., 0.66, 1, 0.03], ...
+        hoveoverstringsub = sprintf('Quit without changing the subsurface model');
+        set(hQuit,'TooltipString',hoveoverstringsub);
+
+        hRvrt = uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Revert','Position',[0., 0.66, 1, 0.03], ...
             'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_revert});
-        uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Save and exit','Position',[0., 0.6, 1, 0.03], ...
+        hoveoverstringsub = sprintf('Revert model to initial values');
+        set(hRvrt,'TooltipString',hoveoverstringsub);
+
+        hSE = uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Accept model and exit','Position',[0., 0.6, 1, 0.03], ...
+            'enable','off', ...
             'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_save});
+        hoveoverstringsub = sprintf('Accept the corrected model and exit. Is allowed only when the new parameters lower the misfit value');
+        set(hSE,'TooltipString',hoveoverstringsub);
+
         hbut_bw = uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Test correction (P/S)','Position',[0., 0.5, 1, 0.03]', ...
             'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_test_BW});
+        hoveoverstringsub = sprintf('Test the misfit value corresponding to the model in the table on the right (using the Body-Waves-based modeling). Necessary before accepting a new set of subsurface parameters.');
+        set(hbut_bw,'TooltipString',hoveoverstringsub);
+
         hbut_sw = uicontrol('Parent',P0,'Style','pushbutton','Units','normalized','String','Test correction (SW)','Position',[0., 0.46, 1, 0.03]', ...
             'Enable',FLAG__PC_features, ...
             'FontSize',USER_PREFERENCE_interface_objects_fontsize,'Callback',{@B_test_SW});
+        hoveoverstringsub = sprintf('Test the misfit value corresponding to the model in the table on the right (using the Surface-Waves-based modeling). Necessary before accepting a new set of subsurface parameters.');
+        set(hbut_sw,'TooltipString',hoveoverstringsub);
         
-        uicontrol('Parent',P0,'Style','text','Units','normalized','String','Misfit (to minimize)','Position',[0., 0.23,  1.0, 0.03], ...
+        hOC0 = uicontrol('Parent',P0,'Style','text','Units','normalized','String','Misfit (to minimize)','Position',[0., 0.23,  1.0, 0.03], ...
             'FontSize',USER_PREFERENCE_interface_objects_fontsize);
-        uicontrol('Parent',P0,'Style','text','Units','normalized','String','Before','Position',[0., 0.2,  0.4, 0.03], ...
+        hOC1 = uicontrol('Parent',P0,'Style','text','Units','normalized','String','Before','Position',[0., 0.2,  0.4, 0.03], ...
             'FontSize',USER_PREFERENCE_interface_objects_fontsize);
         holdmisf = uicontrol('Parent',P0,'Style','text','Units','normalized','String','0','Position',[0.4, 0.2,  0.6, 0.03], ...
             'FontSize',USER_PREFERENCE_interface_objects_fontsize);
-        uicontrol('Parent',P0,'Style','text','Units','normalized','String','After','Position',[0., 0.17,  0.4, 0.03], ...
+        hOC3 = uicontrol('Parent',P0,'Style','text','Units','normalized','String','After','Position',[0., 0.17,  0.4, 0.03], ...
             'FontSize',USER_PREFERENCE_interface_objects_fontsize);
         hnewmisf = uicontrol('Parent',P0,'Style','text','Units','normalized','String','0','Position',[0.4, 0.17, 0.6, 0.03], ...
             'FontSize',USER_PREFERENCE_interface_objects_fontsize);
@@ -6164,7 +6211,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         TB = uitable('Parent',P1,'ColumnName',cnames,'Units','normalized','Position',[0.0 0.0 1 1], ...
             'FontSize',USER_PREFERENCE_interface_objects_fontsize,'ColumnFormat',{'bank','bank','bank','bank','bank','bank'}, ...
             'ColumnWidth',{75 75 50 50 50 50}); 
-        set(TB, 'ColumnEditable',logical([1 1 1 1 1 1 0]))
+        set(TB, 'ColumnEditable',logical([1 1 1 1 1 1 0]));
         set(TB,'Data',newdata);
         
         hAx_mm= axes('Parent',P2,'Units', 'normalized','Units','normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position', [0.1 0.1 0.8 0.8]);
@@ -6191,6 +6238,14 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         function B_revert(~,~,~)% revert to original
             newdata = data;
             set(TB,'Data',newdata);
+            bgclr=0.94*[1 1 1];
+            hoveoverstringsub = sprintf('Model has been reverted to its initial state');
+            set(hOC0,'BackgroundColor',bgclr,'TooltipString',hoveoverstringsub)
+            set(hOC1,'BackgroundColor',bgclr,'TooltipString',hoveoverstringsub)
+            set(holdmisf,'BackgroundColor',bgclr,'TooltipString',hoveoverstringsub)
+            set(hOC3,'BackgroundColor',bgclr,'TooltipString',hoveoverstringsub)
+            set(hnewmisf,'BackgroundColor',bgclr,'TooltipString',hoveoverstringsub)
+            set(hSE,'enable','off','BackgroundColor',bgclr);
         end
 
         function B_save(~,~,~)% save and exit 
@@ -6242,7 +6297,24 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             OUT1 = single_fwd_model(MDL,x_vec);
             [tMFit,~,~,~] = get_single_model_misfit(P.isshown.id, OUT1{2});
             set(hnewmisf,'String',num2str(tMFit));
-            
+            if(oMFit>=tMFit)
+                hoveoverstringsub = sprintf('Good! The set of subsurface parameters corresponds to a lower misfit value.');
+                set(hOC0,'BackgroundColor','green','TooltipString',hoveoverstringsub);
+                set(hOC1,'BackgroundColor','green','TooltipString',hoveoverstringsub);
+                set(holdmisf,'BackgroundColor','green','TooltipString',hoveoverstringsub);
+                set(hOC3,'BackgroundColor','green','TooltipString',hoveoverstringsub);
+                set(hnewmisf,'BackgroundColor','green','TooltipString',hoveoverstringsub);
+                set(hSE,'enable','on','BackgroundColor','green');
+            else
+                hoveoverstringsub = sprintf('Bad! This subsurface model is worse than the original one.');
+                set(hOC0,'BackgroundColor','red','TooltipString',hoveoverstringsub)
+                set(hOC1,'BackgroundColor','red','TooltipString',hoveoverstringsub)
+                set(holdmisf,'BackgroundColor','red','TooltipString',hoveoverstringsub)
+                set(hOC3,'BackgroundColor','red','TooltipString',hoveoverstringsub)
+                set(hnewmisf,'BackgroundColor','red','TooltipString',hoveoverstringsub)
+                set(hSE,'enable','off','BackgroundColor','red');
+            end
+
             subredrow();
             bgc = 0.9*[1 1 1];
             set(hbut_bw,'BackgroundColor',bgc, 'String', 'Test correction (P/S)');
@@ -6459,8 +6531,6 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
     end
     %% Multiple optimization 
     function [OUTMS] = perturbe_models(INMS)
-        if strcmp( get(hRand,'String'), 'Uniform ')
-        end
         OUTMS = INMS;
         
         % MTP: Model To Perturbe
@@ -7066,7 +7136,8 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             hold(h_ax(2),'off') 
             normalized_local_misfits = Misfit_vs_Iter_MULPTIPLE_local(end,:)./ max(Misfit_vs_Iter_MULPTIPLE_local); 
             
-            plot(h_ax(2),  normalized_local_misfits, '.-k','LineWidth',3,'MarkerSize',5);
+            % OLD plot(h_ax(2),  normalized_local_misfits, 'diamondk','LineWidth',3,'MarkerSize',5);
+            bar(h_ax(2),  normalized_local_misfits); % 230802
             grid on
             xlabel(h_ax(2),'Location ID');
             ylabel(h_ax(2),'100 M(i)/M_0(i)');
@@ -7127,7 +7198,6 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             case 5; tmp = QSList; str=strcat('Qs in: ',Pname);
             otherwise; tmp = VSList; str=strcat('Vs in: ',Pname); 
         end
-%       
         
         tmp = tmp(:, ids);
         rr = P.profile_ids{Pid,1}(:,2);% profile_ids(:,2);
@@ -7197,8 +7267,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
         plot(0,0)
        
         %  quantity
-        %  vp  vs  rho  xhx  Qp  Qs
-        
+        %  vp  vs  rho  xhx  Qp  Qs        
         if (isempty(ROList) || isempty(VPList) || isempty(QPList) || isempty(VSList) || isempty(QSList)); refresh_models_list2D(); end       
         switch(quantity)
             case 1; prpperty = VPList;  Z = ZZList;  str='Vp';  nxx = nx_ticks; nyy = ny_ticks;
@@ -7265,7 +7334,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             % NEW______________________________________________________________________   
             lines1= linspace( min(min(DAft)), max(max(DAft)), 200 );
             hdl = contourf( xi, zi, DAft, lines1, 'EdgeColor','none'); 
-            set(hdl, 'Visible','Off') 
+            %set(hdl, 'Visible','Off') 
             hold on
         end
         if show_terrain==1
@@ -7319,65 +7388,14 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
             hdl = fill(polygonx ,polygony, [1 1 1]);
             set(hdl, 'Visible','Off') 
         end
-        caxis([min(min(DATI)), max(max(DATI))])
+        clim([min(min(DATI)), max(max(DATI))]); % 230802  caxis([min(min(DATI)), max(max(DATI))])
         % 
         colorbar
         drawnow
         bottom_Z = (min_z-0.1);
     end% function
-%%     function imagenorm( DATI, Xivec,Zjvec, nx,nz, smoothing_strategy,smoothing_radius)     NO ELEVATION V3.0.0
-%         % 
-%         % not accounts for elevation
-%         %
-%         %DATI(DATI == 0) = NaN;
-% 
-%         [XBef,ZBef] = meshgrid(Xivec,Zjvec);
-% 
-%         xmi = min(Xivec);
-%         xma = max(Xivec);
-%         zmi = min(Zjvec);
-%         zma = max(Zjvec);
-% 
-%         xi = linspace(xmi, xma, nx);%%  change resolution
-%         zi = fliplr(linspace(zmi, zma, nz));%%  change resolution
-%         [XAft,ZAft] = meshgrid(xi,zi);
-%         %save debug_imagenorm.mat
-%         DAft = interp2(XBef,ZBef,DATI,  XAft,ZAft);
-% 
-%         %% smoothing
-%         [DAft] = prfsmoothing(DAft, smoothing_strategy,smoothing_radius);
-% 
-%         
-%         %
-%         % OLD _____________________________________________________________________
-%         % image(xi,zi, DAft,'CDataMapping','scaled');
-%         % NEW______________________________________________________________________        
-% 
-%         lines1= linspace( min(min(DAft)), max(max(DAft)), 200 );
-%         contourf( xi, zi, DAft, lines1, 'EdgeColor','none'); 
-%         hold on
-% 
-%         vmax = max(max(DAft));
-% 
-%         % if( (vmax <= 1000) );                  lines = 100: 100 : 1000; end
-%         % if( (1000 < vmax) && (vmax <= 1900) ); lines = 100: 150 : 1900; end
-%         % if( (1900 < vmax) && (vmax <= 3100) ); lines = 100: 300 : 3100; end
-%         % if( (vmax > 3000) );                   lines = 100: 500 : vmax; end
-%         %lines = min(min(DAft)): 100 : max(max(DAft));
-%         %[C,h] = contour( xi, zi, DAft, lines,'EdgeColor','k','Fill','off');
-%         %clabel(C,h);
-%         % _________________________________________________________________________
-% 
-% 
-% 
-%         caxis([min(min(DATI)), max(max(DATI))])
-% 
-%         % 
-%         colorbar
-%         drawnow
-% 
-%     end% function
-%%
+
+    %% more
     function DL = modeldepths(m)
         DH = MDLS{1,m}(:,4);
         nlay = size(DH,1);
@@ -7441,8 +7459,6 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
     end
     
     function plot_extern(~,~,idx)
-%         hxten = figure;
-%         hAxs= axes('Parent',hxten,'Units', 'normalized','Units','normalized','FontSize',USER_PREFERENCE_interface_objects_fontsize,'Position', [0.1 0.1 0.85 0.85]);
         switch(idx) 
             case 1% Curve-Weighting Function
                 plot__curve_weights(1);
@@ -7477,19 +7493,7 @@ x               %190404  if isfield(BIN,'appname'); appname = BIN.appname; end
                 draw_Misfit_vs_it__MULTIPLE(1);    
         end
     end
-    function funct_saveimage(~,~,~)
-        [file,thispath] =  uiputfile({'*.eps';'*.jpg';'*.fig'},'Save image as', strcat(working_folder,'image.eps'));
-        fname = strcat(thispath,file);
-        if( file ~= 0)
-%             switch (idx)
-%                 case 100; hh = hAx_1d_confidence;%  save confidence  
-%                     
-%             end
-            
-            saveas(H.gui, fname);% saveas(hh, fname);
-            fprintf('Image saved.\n');
-        end
-    end
+
     %% Confidence
     function [SS,poten, X1,X2, var1,var2] = confidence_get_limits(vp,vs,ro,hh,qp,qs,daf, vala,valb, nlaya,nlayb)
         % 
